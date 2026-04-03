@@ -28,7 +28,7 @@ class PersonneRepository {
     List<Map<String, dynamic>> maps;
     
     if (searchQuery != null && searchQuery.isNotEmpty) {
-      maps = await _dbHelper.search('personnes', 'nom_naissance', searchQuery);
+      maps = await _dbHelper.searchInTable('personnes', 'nom_naissance', searchQuery);
     } else {
       maps = await _dbHelper.getAll('personnes');
     }
@@ -37,12 +37,12 @@ class PersonneRepository {
   }
 
   Future<List<Personne>> getByNom(String nom) async {
-    final maps = await _dbHelper.search('personnes', 'nom_naissance', nom);
+    final maps = await _dbHelper.searchInTable('personnes', 'nom_naissance', nom);
     return maps.map((map) => Personne.fromMap(map)).toList();
   }
 
   Future<List<Personne>> getByPrenoms(String prenoms) async {
-    final maps = await _dbHelper.search('personnes', 'prenoms', prenoms);
+    final maps = await _dbHelper.searchInTable('personnes', 'prenoms', prenoms);
     return maps.map((map) => Personne.fromMap(map)).toList();
   }
 
@@ -89,12 +89,12 @@ class PersonneRepository {
   }
 
   Future<List<Personne>> getBornIn(String lieu) async {
-    final maps = await _dbHelper.search('personnes', 'lieu_naissance', lieu);
+    final maps = await _dbHelper.searchInTable('personnes', 'lieu_naissance', lieu);
     return maps.map((map) => Personne.fromMap(map)).toList();
   }
 
   Future<List<Personne>> getDiedIn(String lieu) async {
-    final maps = await _dbHelper.search('personnes', 'lieu_deces', lieu);
+    final maps = await _dbHelper.searchInTable('personnes', 'lieu_deces', lieu);
     return maps.map((map) => Personne.fromMap(map)).toList();
   }
 
