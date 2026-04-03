@@ -1,0 +1,133 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Android specific
+android/local.properties
+android/gradle.properties
+android/app/google-services.json
+android/app/google-services.json.debug
+android/app/google-services.json.release
+
+# iOS specific
+ios/Runner/GoogleService-Info.plist
+ios/Flutter/Generated.xcconfig
+ios/Flutter/GeneratedPluginRegistrant.swift
+ios/Pods/
+ios/.symlinks/
+ios/Podfile.lock
+
+# Windows specific
+build/windows/runner/Runner.exe
+build/windows/runner/Runner.exe.manifest
+
+# Linux specific
+build/linux/flutter/bundle/
+
+# macOS specific
+build/macos/Build/Products/
+build/macos/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Web specific
+build/web/
+
+# Keys and secrets (IMPORTANT!)
+*.key
+*.p12
+*.p8
+*.pem
+*.jks
+secrets.json
+config/secrets.dart
+.env
+.env.local
+
+# Database files (local SQLite)
+*.db
+*.db-shm
+*.db-wal
+family_tree.db
+
+# Test coverage
+lcov.info
+coverage/
+
+# Documentation
+/docs/api/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*~
+
+# Lock files
+*.lock
+package-lock.json
+yarn.lock
+
+# Logs
+logs/
+*.log
+
+# Backup files
+*.backup
+*.old
+
+# Cache directories
+.cache/
+cache/
+
+# Node modules (si utilisé pour outils de build)
+node_modules/
+
+# Fichiers de configuration locale
+local.properties
+gradle.properties.local
+
+# Fichiers spécifiques à l'authentification
+auth_config.json
+user_sessions.json
