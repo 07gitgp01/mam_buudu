@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Mam Buudu - Arbre Généalogique Familial
 
 Une application Flutter complète pour la gestion et la visualisation d'arbres généalogiques familiaux.
@@ -235,3 +236,7 @@ Pour toute question ou suggestion :
 ---
 
 **Mam Buudu** - *Votre histoire familiale, préservée pour les générations futures* 🌳
+=======
+# mam_buudu
+Project pour arbre généalogique!
+>>>>>>> 89d5bad300f6ecd829fee2993d9b00d15c316672
