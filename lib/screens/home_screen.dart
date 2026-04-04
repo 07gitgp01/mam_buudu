@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../database/personne_repository.dart';
 import '../models/personne.dart';
+import '../services/auth_local_service.dart';
 import 'person_form_screen.dart';
 import 'union_form_screen.dart';
 import 'person_detail_screen.dart';
 import '../utils/gedcom_parser.dart';
 import '../utils/gedcom_exporter.dart';
+import 'landing_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final PersonneRepository _personneRepo = PersonneRepository();
+  final AuthLocalService _authService = AuthLocalService();
   List<Personne> _personnes = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -172,6 +175,55 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _logout() async {
+    try {
+      await _authService.logout();
+      
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LandingScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la déconnexion: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _logout();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Se déconnecter'),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Personne> get _filteredPersonnes {
     if (_searchQuery.isEmpty) return _personnes;
     
@@ -189,7 +241,29 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Arbre Généalogique'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const LandingScreen()),
+              (route) => false,
+            );
+          },
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Arbre Généalogique'),
+            if (_authService.currentUser != null)
+              Text(
+                'Connecté: ${_authService.currentUser!.nomComplet}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+          ],
+        ),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -197,6 +271,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _importerGedcom();
               } else if (value == 'export_gedcom') {
                 _exporterGedcom();
+              } else if (value == 'logout') {
+                _showLogoutDialog();
               }
             },
             itemBuilder: (context) => [
@@ -217,6 +293,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Icons.download),
                     SizedBox(width: 8),
                     Text('Exporter GEDCOM'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Se déconnecter', style: TextStyle(color: Colors.red)),
                   ],
                 ),
               ),

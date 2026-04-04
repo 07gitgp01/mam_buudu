@@ -1,0 +1,47 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fond dégradé -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#87CEEB;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#E0F2FE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFFFFF;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="20"/>
+      <feOffset dx="0" dy="10" result="offsetblur"/>
+      <feFlood flood-color="#000000" flood-opacity="0.2"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Fond arrondi -->
+  <rect width="1024" height="1024" rx="180" fill="url(#bgGradient)"/>
+  
+  <!-- Icône famille -->
+  <g filter="url(#shadow)">
+    <!-- Grand cercle parent -->
+    <circle cx="512" cy="350" r="80" fill="#FFFFFF" opacity="0.9"/>
+    <path d="M512 310 C532 310 548 326 548 346 C548 366 532 382 512 382 C492 382 476 366 476 346 C476 326 492 310 512 310 Z" fill="#2E7D32"/>
+    <path d="M512 382 C532 382 548 398 548 418 L548 450 C548 450 512 470 476 450 L476 418 C476 398 492 382 512 382 Z" fill="#2E7D32"/>
+    
+    <!-- Cercles enfants -->
+    <circle cx="350" cy="550" r="60" fill="#FFFFFF" opacity="0.8"/>
+    <path d="M350 520 C365 520 378 533 378 548 C378 563 365 576 350 576 C335 576 322 563 322 548 C322 533 335 520 350 520 Z" fill="#1976D2"/>
+    <path d="M350 576 C365 576 378 589 378 604 L378 628 C378 628 350 642 322 628 L322 604 C322 589 335 576 350 576 Z" fill="#1976D2"/>
+    
+    <circle cx="674" cy="550" r="60" fill="#FFFFFF" opacity="0.8"/>
+    <path d="M674 520 C689 520 702 533 702 548 C702 563 689 576 674 576 C659 576 646 563 646 548 C646 533 659 520 674 520 Z" fill="#7B1FA2"/>
+    <path d="M674 576 C689 576 702 589 702 604 L702 628 C702 628 674 642 646 628 L646 604 C646 589 659 576 674 576 Z" fill="#7B1FA2"/>
+    
+    <!-- Lignes de connexion -->
+    <line x1="512" y1="430" x2="350" y2="490" stroke="#2E7D32" stroke-width="4" opacity="0.6"/>
+    <line x1="512" y1="430" x2="674" y2="490" stroke="#2E7D32" stroke-width="4" opacity="0.6"/>
+  </g>
+  
+  <!-- Texte Mam Buudu -->
+  <text x="512" y="750" font-family="Arial, sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#2E7D32">Mam Buudu</text>
+</svg>

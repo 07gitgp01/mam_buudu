@@ -9,6 +9,9 @@ import 'screens/person_detail_screen.dart';
 import 'screens/union_form_screen.dart';
 import 'screens/tree_screen.dart';
 import 'screens/livret_screen.dart';
+import 'screens/auth/auth_splash_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'services/notification_service.dart';
 
 void main() async {
@@ -121,9 +124,12 @@ class MyApp extends StatelessWidget {
           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
       ),
-      initialRoute: '/landing',
+      initialRoute: '/auth_splash',
       routes: {
+        '/auth_splash': (context) => const AuthSplashScreen(),
         '/landing': (context) => const LandingScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
         '/wizard': (context) => const WizardScreen(),
         '/home': (context) => const HomeScreen(),
         '/tree': (context) {

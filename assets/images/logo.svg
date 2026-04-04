@@ -1,0 +1,29 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Tronc de l'arbre -->
+  <rect x="50" y="60" width="20" height="40" fill="#8B4513" rx="2"/>
+  
+  <!-- Branches principales -->
+  <path d="M60 60 L40 40" stroke="#8B4513" stroke-width="4" stroke-linecap="round"/>
+  <path d="M60 60 L80 40" stroke="#8B4513" stroke-width="4" stroke-linecap="round"/>
+  <path d="M60 50 L35 30" stroke="#8B4513" stroke-width="3" stroke-linecap="round"/>
+  <path d="M60 50 L85 30" stroke="#8B4513" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Feuilles -->
+  <circle cx="35" cy="35" r="8" fill="#2E7D32" opacity="0.8"/>
+  <circle cx="85" cy="35" r="8" fill="#2E7D32" opacity="0.8"/>
+  <circle cx="30" cy="25" r="6" fill="#81C784" opacity="0.8"/>
+  <circle cx="90" cy="25" r="6" fill="#81C784" opacity="0.8"/>
+  <circle cx="40" cy="40" r="7" fill="#2E7D32" opacity="0.8"/>
+  <circle cx="80" cy="40" r="7" fill="#2E7D32" opacity="0.8"/>
+  <circle cx="60" cy="30" r="8" fill="#2E7D32" opacity="0.8"/>
+  <circle cx="45" cy="20" r="5" fill="#81C784" opacity="0.8"/>
+  <circle cx="75" cy="20" r="5" fill="#81C784" opacity="0.8"/>
+  
+  <!-- Racines -->
+  <path d="M55 100 L45 110" stroke="#8B4513" stroke-width="3" stroke-linecap="round"/>
+  <path d="M60 100 L60 115" stroke="#8B4513" stroke-width="3" stroke-linecap="round"/>
+  <path d="M65 100 L75 110" stroke="#8B4513" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Cercle de fond -->
+  <circle cx="60" cy="60" r="55" fill="#E8F5E8" opacity="0.3"/>
+</svg>

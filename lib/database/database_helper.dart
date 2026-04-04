@@ -49,6 +49,20 @@ class DatabaseHelper {
       )
     ''');
 
+    // Création de la table personnes_utilisateurs
+    await db.execute('''
+      CREATE TABLE personnes_utilisateurs (
+        personne_id TEXT,
+        utilisateur_id TEXT,
+        permission TEXT DEFAULT 'read',  -- 'read', 'write', 'admin'
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (personne_id, utilisateur_id),
+        FOREIGN KEY (personne_id) REFERENCES personnes (id),
+        FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs (id)
+      )
+    ''');
+
     // Création de la table personnes
     await db.execute('''
       CREATE TABLE personnes (
@@ -177,6 +191,20 @@ class DatabaseHelper {
           created_at INTEGER NOT NULL,
           question_secrete TEXT,
           reponse_secrete TEXT
+        )
+      ''');
+
+      // Ajouter la table personnes_utilisateurs
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS personnes_utilisateurs (
+          personne_id TEXT,
+          utilisateur_id TEXT,
+          permission TEXT DEFAULT 'read',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          PRIMARY KEY (personne_id, utilisateur_id),
+          FOREIGN KEY (personne_id) REFERENCES personnes (id),
+          FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs (id)
         )
       ''');
     }
