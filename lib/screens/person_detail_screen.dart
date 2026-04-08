@@ -31,9 +31,26 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   @override
   void initState() {
     super.initState();
+    print('🚀 PersonDetailScreen initState pour ${widget.personneId}');
     _loadPersonne();
   }
 
+  @override
+  void didUpdateWidget(PersonDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.personneId != widget.personneId) {
+      print('🔄 PersonDetailScreen didUpdateWidget: ${oldWidget.personneId} -> ${widget.personneId}');
+      _loadPersonne();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    print('🔄 PersonDetailScreen didChangeDependencies');
+  }
+
+  
   Future<void> _loadPersonne() async {
     setState(() {
       _isLoading = true;
@@ -70,14 +87,25 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   Future<void> _loadUnions() async {
     if (_personne == null) return;
     
+    print('=== CHARGEMENT UNIONS pour ${_personne!.nomComplet} (${_personne!.id}) ===');
+    
     try {
       final unions = await _unionRepo.getByPersonneId(_personne!.id);
+      print('✅ Trouvé ${unions.length} union(s)');
+      for (var union in unions) {
+        print('  - Union: ${union.id} - ${union.type} - ${union.dateDebut?.toStorage()}');
+        print('    Participants: ${union.parentIds.length}');
+        print('    Enfants: ${union.enfantIds.length}');
+      }
+      
       setState(() {
         _unions = unions;
       });
+      print('✅ setState appelé, unions mises à jour');
     } catch (e) {
-      print('Erreur lors du chargement des unions: $e');
+      print('❌ Erreur lors du chargement des unions: $e');
     }
+    print('=== FIN CHARGEMENT UNIONS ===');
   }
 
   Future<void> _loadEnfants() async {
@@ -539,6 +567,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   }
 
   Future<void> _addUnion() async {
+    print('=== DÉBUT ADD UNION pour ${_personne!.nomComplet} ===');
+    
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -548,10 +578,17 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       ),
     );
     
+    print('🔙 Retour de UnionFormScreen avec résultat: $result (${result.runtimeType})');
+    
     if (result == true) {
-      _loadUnions();
-      _loadEnfants(); // Recharger les enfants au cas où
+      print('✅ Résultat true, rechargement des unions et enfants...');
+      await _loadUnions();
+      await _loadEnfants(); // Recharger les enfants au cas où
+      print('✅ Rechargement terminé');
+    } else {
+      print('❌ Résultat null ou false, pas de rechargement');
     }
+    print('=== FIN ADD UNION ===');
   }
 
   Future<void> _addChildToUnion(Union union) async {

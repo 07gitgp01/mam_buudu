@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'database/database_helper.dart';
 import 'models/union.dart';
@@ -15,11 +16,16 @@ import 'screens/auth/register_screen.dart';
 import 'services/notification_service.dart';
 
 void main() async {
+  print('=== MAIN START ===');
   WidgetsFlutterBinding.ensureInitialized();
+  print('Flutter binding initialized');
   
   // Initialisation de la base de données
+  print('Initializing database...');
   await DatabaseHelper.instance.database;
+  print('Database initialization completed');
   
+  print('Starting app...');
   runApp(const MyApp());
 }
 
@@ -31,6 +37,15 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: NotificationService.navigatorKey,
       title: 'Mam Buudu - Arbre Généalogique',
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr', 'FR'),
+        Locale('en', 'US'),
+      ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)),
         useMaterial3: true,

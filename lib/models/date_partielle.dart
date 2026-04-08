@@ -28,31 +28,73 @@ class DatePartielle {
       throw ArgumentError('La date ne peut pas être vide');
     }
     
+    // Vérifier si c'est le format français (ex: "décembre 2026")
+    if (date.contains(' ')) {
+      final parts = date.split(' ');
+      if (parts.length == 2) {
+        final moisPart = parts[0].toLowerCase();
+        final anneePart = parts[1];
+        
+        // Parser l'année
+        final annee = int.tryParse(anneePart);
+        if (annee == null) {
+          throw ArgumentError('Format de date non reconnu: $date');
+        }
+        
+        // Parser le mois
+        final moisNoms = [
+          'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+          'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+        ];
+        
+        final moisIndex = moisNoms.indexOf(moisPart);
+        if (moisIndex == -1) {
+          throw ArgumentError('Mois non reconnu: $moisPart');
+        }
+        
+        return DatePartielle(
+          annee: annee,
+          mois: moisIndex + 1,
+          jour: null, // Pas de jour dans ce format
+        );
+      }
+    }
+    
+    // Format standard "YYYY-MM-DD" ou "YYYY-MM" ou "YYYY"
     final parts = date.split('-');
     
     switch (parts.length) {
       case 1:
         // Format "YYYY"
-        return DatePartielle(annee: int.parse(parts[0]));
+        final annee = int.tryParse(parts[0]);
+        if (annee == null) {
+          throw ArgumentError('Format de date non reconnu: $date');
+        }
+        return DatePartielle(annee: annee);
       case 2:
         // Format "YYYY-MM"
-        if (parts.length >= 2) {
-          return DatePartielle(
-            annee: int.parse(parts[0]),
-            mois: int.parse(parts[1]),
-          );
+        final annee = int.tryParse(parts[0]);
+        final mois = int.tryParse(parts[1]);
+        if (annee == null || mois == null) {
+          throw ArgumentError('Format de date non reconnu: $date');
         }
-        throw ArgumentError('Format de date non reconnu: $date');
+        return DatePartielle(
+          annee: annee,
+          mois: mois,
+        );
       case 3:
         // Format "YYYY-MM-DD"
-        if (parts.length >= 3) {
-          return DatePartielle(
-            annee: int.parse(parts[0]),
-            mois: int.parse(parts[1]),
-            jour: int.parse(parts[2]),
-          );
+        final annee = int.tryParse(parts[0]);
+        final mois = int.tryParse(parts[1]);
+        final jour = int.tryParse(parts[2]);
+        if (annee == null || mois == null || jour == null) {
+          throw ArgumentError('Format de date non reconnu: $date');
         }
-        throw ArgumentError('Format de date non reconnu: $date');
+        return DatePartielle(
+          annee: annee,
+          mois: mois,
+          jour: jour,
+        );
       default:
         throw ArgumentError('Format de date non reconnu: $date');
     }
@@ -60,14 +102,57 @@ class DatePartielle {
 
   @override
   String toString() {
-    if (jour != null && mois != null) {
-      final dateFormat = DateFormat('d MMMM yyyy', 'fr_FR');
-      return dateFormat.format(DateTime(annee, mois!, jour!));
-    } else if (mois != null) {
-      final dateFormat = DateFormat('MMMM yyyy', 'fr_FR');
-      return dateFormat.format(DateTime(annee, mois!));
-    } else {
-      return annee.toString();
+    try {
+      if (jour != null && mois != null) {
+        final dateFormat = DateFormat('d MMMM yyyy', 'fr_FR');
+        return dateFormat.format(DateTime(annee, mois!, jour!));
+      } else if (mois != null) {
+        final dateFormat = DateFormat('MMMM yyyy', 'fr_FR');
+        return dateFormat.format(DateTime(annee, mois!));
+      } else {
+        return annee.toString();
+      }
+    } catch (e) {
+      // Fallback si la locale n'est pas initialisée
+      if (jour != null && mois != null) {
+        return '$jour/$mois/$annee';
+      } else if (mois != null) {
+        final moisNoms = [
+          'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+          'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+        ];
+        return '${moisNoms[mois! - 1]} $annee';
+      } else {
+        return annee.toString();
+      }
+    }
+  }
+
+  // Méthode pour l'affichage formaté (français)
+  String toDisplayString() {
+    try {
+      if (jour != null && mois != null) {
+        final dateFormat = DateFormat('d MMMM yyyy', 'fr_FR');
+        return dateFormat.format(DateTime(annee, mois!, jour!));
+      } else if (mois != null) {
+        final dateFormat = DateFormat('MMMM yyyy', 'fr_FR');
+        return dateFormat.format(DateTime(annee, mois!));
+      } else {
+        return annee.toString();
+      }
+    } catch (e) {
+      // Fallback si la locale n'est pas initialisée
+      if (jour != null && mois != null) {
+        return '$jour/$mois/$annee';
+      } else if (mois != null) {
+        final moisNoms = [
+          'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+          'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+        ];
+        return '${moisNoms[mois! - 1]} $annee';
+      } else {
+        return annee.toString();
+      }
     }
   }
 

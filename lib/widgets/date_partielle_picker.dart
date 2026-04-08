@@ -26,7 +26,7 @@ class _DatePartiellePickerState extends State<DatePartiellePicker> {
     super.initState();
     _currentValue = widget.initialValue;
     _controller = TextEditingController(
-      text: _currentValue?.toString() ?? '',
+      text: _currentValue?.toDisplayString() ?? '',
     );
   }
 
@@ -54,15 +54,109 @@ class _DatePartiellePickerState extends State<DatePartiellePicker> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Sélectionner une date'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Choisissez le mode de sélection :'),
+                const SizedBox(height: 16),
+                Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showNativeDatePicker(context);
+                        },
+                        icon: const Icon(Icons.calendar_today),
+                        label: const Text('Calendrier'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showManualDatePicker(context);
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Manuel'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showNativeDatePicker(BuildContext context) async {
+    try {
+      final DateTime? picked = await showDatePicker(
+        context: context,
+        initialDate: _currentValue != null 
+            ? DateTime(_currentValue!.annee, _currentValue!.mois ?? 1, _currentValue!.jour ?? 1)
+            : DateTime.now(),
+        firstDate: DateTime(1800),
+        lastDate: DateTime.now().add(const Duration(days: 365 * 50)),
+        locale: const Locale('fr', 'FR'),
+        helpText: 'Sélectionner une date',
+        cancelText: 'Annuler',
+        confirmText: 'Valider',
+        fieldLabelText: 'Date',
+        fieldHintText: 'JJ/MM/AAAA',
+      );
+
+      if (picked != null) {
+        final date = DatePartielle(
+          annee: picked.year,
+          mois: picked.month,
+          jour: picked.day,
+        );
+        
+        setState(() {
+          _currentValue = date;
+          _controller.text = date.toDisplayString();
+        });
+        widget.onChanged(date);
+      }
+    } catch (e) {
+      print('Error in showDatePicker: $e');
+      // Fallback vers le mode manuel si le DatePicker échoue
+      _showManualDatePicker(context);
+    }
+  }
+
+  void _showManualDatePicker(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
         return DatePartielleDialog(
           initialValue: _currentValue,
+          dialogContext: dialogContext,
           onDateSelected: (date) {
+            // D'abord mettre à jour l'état local
             setState(() {
               _currentValue = date;
-              _controller.text = date?.toString() ?? '';
+              _controller.text = date?.toDisplayString() ?? '';
             });
+            // Ensuite appeler le callback du parent
             widget.onChanged(date);
-            Navigator.of(context).pop();
+            // Le dialogue sera fermé par le _validateDate
           },
         );
       },
@@ -73,11 +167,13 @@ class _DatePartiellePickerState extends State<DatePartiellePicker> {
 class DatePartielleDialog extends StatefulWidget {
   final DatePartielle? initialValue;
   final ValueChanged<DatePartielle?> onDateSelected;
+  final BuildContext? dialogContext;
 
   const DatePartielleDialog({
     super.key,
     this.initialValue,
     required this.onDateSelected,
+    this.dialogContext,
   });
 
   @override
@@ -265,18 +361,38 @@ class _DatePartielleDialogState extends State<DatePartielleDialog> {
   }
 
   void _validateDate() {
+    print('=== VALIDATE DATE ===');
+    print('Year: $_year, Month: $_month, Day: $_day');
+    print('Year only: $_yearOnly, Month only: $_monthOnly');
+    
     try {
+      print('Creating DatePartielle...');
       final date = DatePartielle(
         annee: _year,
         mois: _month,
         jour: _day,
       );
+      print('DatePartielle created successfully: $date');
+      
+      print('Calling onDateSelected...');
       widget.onDateSelected(date);
-      Navigator.of(context).pop();
+      print('onDateSelected called');
+      
+      print('Popping dialog...');
+      if (widget.dialogContext != null) {
+        Navigator.of(widget.dialogContext!).pop();
+        print('Dialog popped with specific context');
+      } else {
+        Navigator.of(context).pop();
+        print('Dialog popped with default context');
+      }
     } catch (e) {
+      print('ERROR in _validateDate: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: $e')),
       );
+      // NE PAS faire Navigator.pop() en cas d'erreur
     }
+    print('=== END VALIDATE DATE ===');
   }
 }

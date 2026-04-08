@@ -6,8 +6,12 @@ class UnionRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
 
   Future<String> insert(Union union) async {
+    print('📝 UnionRepository.insert - Union: ${union.id}, Type: ${union.type}');
     final unionMap = union.toMap();
-    return await _dbHelper.insert('unions', unionMap);
+    print('📝 Union map: $unionMap');
+    final id = await _dbHelper.insert('unions', unionMap);
+    print('✅ Union insérée avec ID: $id');
+    return id;
   }
 
   Future<void> update(Union union) async {
@@ -55,7 +59,29 @@ class UnionRepository {
   }
 
   Future<List<Union>> getByPersonneId(String personneId) async {
+    print('=== DEBUG getByPersonneId ===');
+    print('Recherche des unions pour personne: $personneId');
+    
     final db = await _dbHelper.database;
+    
+    // D'abord vérifier si la personne existe bien dans union_participants
+    final participantCheck = await db.query(
+      'union_participants',
+      where: 'personne_id = ?',
+      whereArgs: [personneId],
+    );
+    print('Participant check: ${participantCheck.length} entrées trouvées');
+    for (var entry in participantCheck) {
+      print('  - Union: ${entry['union_id']}, Personne: ${entry['personne_id']}');
+    }
+    
+    // Ensuite vérifier les unions
+    final unionCheck = await db.query('unions');
+    print('Union check: ${unionCheck.length} unions totales');
+    for (var entry in unionCheck) {
+      print('  - Union: ${entry['id']}, Type: ${entry['type']}');
+    }
+    
     final maps = await db.rawQuery('''
       SELECT u.* FROM unions u
       INNER JOIN union_participants up ON u.id = up.union_id
@@ -63,16 +89,27 @@ class UnionRepository {
       ORDER BY u.date_debut DESC
     ''', [personneId]);
     
+    print('Requête JOIN result: ${maps.length} maps');
+    for (var map in maps) {
+      print('  - Map: ${map}');
+    }
+    
+    print('=== FIN DEBUG getByPersonneId ===');
+    
     List<Union> unions = [];
     
     for (final map in maps) {
       final unionId = map['id'] as String;
+      print('  Processing union: $unionId');
       final parentIds = await getParticipantIds(unionId);
       final enfantIds = await getEnfantIds(unionId);
       
-      unions.add(Union.fromMap(map, parentIds: parentIds, enfantIds: enfantIds));
+      final union = Union.fromMap(map, parentIds: parentIds, enfantIds: enfantIds);
+      unions.add(union);
+      print('  Union: ${union.type}, Participants: ${union.parentIds.length}, Enfants: ${union.enfantIds.length}');
     }
     
+    print('Returning ${unions.length} unions for person $personneId');
     return unions;
   }
 
@@ -80,6 +117,7 @@ class UnionRepository {
     String role = 'conjoint',
     int ordre = 0
   }) async {
+    print('👥 UnionRepository.ajouterParticipant - Union: $unionId, Personne: $personneId, Role: $role, Ordre: $ordre');
     final db = await _dbHelper.database;
     
     // Vérifier si la personne n'est pas déjà participant
@@ -90,12 +128,16 @@ class UnionRepository {
     );
     
     if (existing.isEmpty) {
+      print('✅ Ajout du participant');
       await db.insert('union_participants', {
         'union_id': unionId,
         'personne_id': personneId,
         'role': role,
         'ordre': ordre,
       });
+      print('✅ Participant ajouté avec succès');
+    } else {
+      print('⚠️ Participant déjà existant, skip');
     }
   }
 
@@ -105,6 +147,15 @@ class UnionRepository {
       'union_participants',
       where: 'union_id = ? AND personne_id = ?',
       whereArgs: [unionId, personneId],
+    );
+  }
+
+  Future<void> retirerTousParticipants(String unionId) async {
+    final db = await _dbHelper.database;
+    await db.delete(
+      'union_participants',
+      where: 'union_id = ?',
+      whereArgs: [unionId],
     );
   }
 

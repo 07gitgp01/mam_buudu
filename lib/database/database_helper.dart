@@ -14,21 +14,37 @@ class DatabaseHelper {
   static DatabaseHelper get instance => _instance;
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
+    print('=== DATABASE HELPER GET DATABASE ===');
+    print('_database is null: ${_database == null}');
+    if (_database != null) {
+      print('Returning existing database instance');
+      return _database!;
+    }
+    print('Initializing new database...');
     _database = await _initDatabase();
+    print('Database initialized successfully');
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
-    Directory documentsDirectory = await getApplicationDocumentsDirectory();
-    String path = join(documentsDirectory.path, 'family_tree.db');
-    
-    return await openDatabase(
-      path,
-      version: 3, // Version incrémentée pour inclure les utilisateurs
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    print('=== INIT DATABASE ===');
+    try {
+      Directory documentsDirectory = await getApplicationDocumentsDirectory();
+      String path = join(documentsDirectory.path, 'family_tree.db');
+      print('Database path: $path');
+      
+      final db = await openDatabase(
+        path,
+        version: 3, // Version incrémentée pour inclure les utilisateurs
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+      print('Database opened successfully');
+      return db;
+    } catch (e) {
+      print('Error initializing database: $e');
+      rethrow;
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -218,6 +234,19 @@ class DatabaseHelper {
   // Méthodes CRUD génériques
   Future<String> insert(String table, Map<String, dynamic> data) async {
     final db = await database;
+    
+    // Si les données contiennent un ID, l'utiliser
+    if (data.containsKey('id') && data['id'] != null) {
+      final providedId = data['id'].toString();
+      await db.insert(
+        table, 
+        data,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      return providedId;
+    }
+    
+    // Sinon, utiliser l'ID auto-incrémenté
     final id = await db.insert(table, data);
     return id.toString();
   }

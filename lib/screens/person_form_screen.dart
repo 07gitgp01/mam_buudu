@@ -336,7 +336,8 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
       }
 
       if (mounted) {
-        Navigator.pop(context, true);
+        // Retourner l'ID de la personne créée/modifiée
+        Navigator.pop(context, personne.id);
       }
     } catch (e) {
       _showErrorSnackBar('Erreur lors de la sauvegarde: $e');

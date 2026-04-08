@@ -283,11 +283,23 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
   }
 
   Future<void> _saveUnion() async {
+    print('=== DÉBUT SAVE UNION ===');
+    print('Mode modification: ${widget.union != null}');
+    print('Type: $_type');
+    print('Participants: ${_participants.length}');
+    for (var p in _participants) {
+      print('  - ${p.nomComplet} (${p.id})');
+    }
+    print('Date début: $_dateDebut');
+    print('Date fin: $_dateFin');
+    
     if (!_formKey.currentState!.validate()) {
+      print('❌ Formulaire invalide');
       return;
     }
 
     if (_participants.isEmpty) {
+      print('❌ Aucun participant sélectionné');
       NotificationService.showError('Veuillez sélectionner au moins un participant');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -298,6 +310,7 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
       return;
     }
 
+    print('✅ Formulaire valide, début sauvegarde...');
     setState(() {
       _isLoading = true;
     });
@@ -318,13 +331,18 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
             ? null 
             : _notesController.text.trim(),
       );
+      
+      print('Union créée: ${union.id} - ${union.type}');
 
       if (widget.union == null) {
         // Création
+        print('📝 Création d\'une nouvelle union...');
         final unionId = await _unionRepo.insert(union);
+        print('✅ Union insérée avec ID: $unionId');
         
         // Ajouter les participants
         for (int i = 0; i < _participants.length; i++) {
+          print('  Ajout participant ${i+1}: ${_participants[i].nomComplet}');
           await _unionRepo.ajouterParticipant(
             unionId,
             _participants[i].id,
@@ -332,13 +350,21 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
             ordre: i,
           );
         }
+        print('✅ Tous les participants ajoutés');
         NotificationService.showSuccess('Union créée avec succès !');
       } else {
         // Modification
+        print('✏️ Modification de l\'union existante...');
         await _unionRepo.update(union);
+        print('✅ Union mise à jour');
         
-        // Mettre à jour les participants (supprimer tous et recréer)
+        // Supprimer tous les participants existants
+        await _unionRepo.retirerTousParticipants(union.id);
+        print('🗑️ Anciens participants supprimés');
+        
+        // Recréer les participants
         for (final participant in _participants) {
+          print('  Re-ajout participant: ${participant.nomComplet}');
           await _unionRepo.ajouterParticipant(
             union.id,
             participant.id,
@@ -346,13 +372,18 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
             ordre: _participants.indexOf(participant),
           );
         }
+        print('✅ Participants recréés');
         NotificationService.showSuccess('Union mise à jour avec succès !');
       }
 
+      print('🏠 Navigation vers l\'écran précédent...');
       if (mounted) {
         Navigator.pop(context, true);
+        print('✅ Navigator.pop appelé avec payload: true');
       }
     } catch (e) {
+      print('❌ ERREUR lors de la sauvegarde: $e');
+      print('Stack trace: ${StackTrace.current}');
       NotificationService.showError('Erreur lors de la sauvegarde de l\'union: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -368,6 +399,7 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
           _isLoading = false;
         });
       }
+      print('=== FIN SAVE UNION ===');
     }
   }
 

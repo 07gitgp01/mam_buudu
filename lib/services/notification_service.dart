@@ -4,70 +4,115 @@ class NotificationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   static void showSuccess(String message) {
-    _showNotification(
+    if (!_showNotification(
       message: message,
       backgroundColor: Colors.green,
       icon: Icons.check_circle,
       duration: const Duration(seconds: 3),
-    );
+    )) {
+      _showSnackBarFallback(message, Colors.green);
+    }
   }
 
   static void showError(String message) {
-    _showNotification(
+    if (!_showNotification(
       message: message,
       backgroundColor: Colors.red,
       icon: Icons.error,
       duration: const Duration(seconds: 5),
-    );
+    )) {
+      _showSnackBarFallback(message, Colors.red);
+    }
   }
 
   static void showInfo(String message) {
-    _showNotification(
+    if (!_showNotification(
       message: message,
       backgroundColor: Colors.blue,
       icon: Icons.info,
       duration: const Duration(seconds: 3),
-    );
+    )) {
+      _showSnackBarFallback(message, Colors.blue);
+    }
   }
 
   static void showWarning(String message) {
-    _showNotification(
+    if (!_showNotification(
       message: message,
       backgroundColor: Colors.orange,
       icon: Icons.warning,
       duration: const Duration(seconds: 4),
-    );
+    )) {
+      _showSnackBarFallback(message, Colors.orange);
+    }
   }
 
-  static void _showNotification({
+  static void _showSnackBarFallback(String message, Color color) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: color,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } catch (e) {
+          print('Erreur lors de l\'affichage du SnackBar: $e');
+        }
+      }
+    });
+  }
+
+  static bool _showNotification({
     required String message,
     required Color backgroundColor,
     required IconData icon,
     required Duration duration,
   }) {
-    final context = navigatorKey.currentContext;
-    if (context == null) return;
+    try {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final context = navigatorKey.currentContext;
+        if (context == null) return;
 
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
+        // Vérifier si le contexte est encore valide
+        if (!context.mounted) return;
 
-    overlayEntry = OverlayEntry(
-      builder: (context) => _NotificationWidget(
-        message: message,
-        backgroundColor: backgroundColor,
-        icon: icon,
-        onRemove: () => overlayEntry.remove(),
-      ),
-    );
+        try {
+          final overlay = Overlay.of(context);
+          if (overlay == null) return;
+          
+          late OverlayEntry overlayEntry;
 
-    overlay.insert(overlayEntry);
+          overlayEntry = OverlayEntry(
+            builder: (context) => _NotificationWidget(
+              message: message,
+              backgroundColor: backgroundColor,
+              icon: icon,
+              onRemove: () => overlayEntry.remove(),
+            ),
+          );
 
-    // Auto-remove after duration
-    Future.delayed(duration, () {
-      if (overlayEntry.mounted) {
-        overlayEntry.remove();
-      }
-    });
+          overlay.insert(overlayEntry);
+
+          // Auto-remove after duration
+          Future.delayed(duration, () {
+            if (overlayEntry.mounted) {
+              overlayEntry.remove();
+            }
+          });
+        } catch (e) {
+          // Silencieusement ignorer les erreurs d'overlay
+          print('Erreur lors de l\'affichage de la notification: $e');
+        }
+      });
+      return true; // Succès
+    } catch (e) {
+      print('Erreur critique dans _showNotification: $e');
+      return false; // Échec
+    }
   }
 }
 

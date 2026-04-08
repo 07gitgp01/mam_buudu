@@ -202,20 +202,14 @@ class _AjoutEnfantScreenState extends State<AjoutEnfantScreen> {
           ),
         );
         
-        if (result == null || result != true) {
+        if (result == null || result is! String) {
           // L'utilisateur a annulé la création
           setState(() {
             _isLoading = false;
           });
           return;
         }
-        
-        // Récupérer la dernière personne créée (simple approximation)
-        final personnes = await _personneRepo.getRecentlyAdded(limit: 1);
-        if (personnes.isEmpty) {
-          throw Exception('Impossible de récupérer la personne créée');
-        }
-        enfantId = personnes.first.id;
+        enfantId = result;
       } else {
         // Utiliser une personne existante
         enfantId = _selectedPersonne.first.id;
