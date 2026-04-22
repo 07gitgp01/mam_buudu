@@ -144,6 +144,25 @@ class DatabaseHelper {
       )
     ''');
 
+    // Création de la table notifications_locales
+    await db.execute('''
+      CREATE TABLE notifications_locales (
+        id TEXT PRIMARY KEY,
+        utilisateur_id TEXT,
+        type TEXT,  -- 'anniversaire', 'evenement', 'rappel'
+        titre TEXT,
+        message TEXT,
+        date_notification INTEGER,  -- timestamp
+        est_lue BOOLEAN DEFAULT FALSE,
+        est_envoyee BOOLEAN DEFAULT FALSE,
+        date_creation INTEGER,
+        personne_id TEXT,
+        created_at INTEGER,
+        updated_at INTEGER,
+        FOREIGN KEY (personne_id) REFERENCES personnes (id)
+      )
+    ''');
+
     // Création des autres tables
     await db.execute('''
       CREATE TABLE medias (

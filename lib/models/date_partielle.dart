@@ -28,9 +28,47 @@ class DatePartielle {
       throw ArgumentError('La date ne peut pas être vide');
     }
     
-    // Vérifier si c'est le format français (ex: "décembre 2026")
+    // Vérifier si c'est un format français
     if (date.contains(' ')) {
       final parts = date.split(' ');
+      
+      // Format "7 janvier 1999"
+      if (parts.length == 3) {
+        final jourPart = parts[0];
+        final moisPart = parts[1].toLowerCase();
+        final anneePart = parts[2];
+        
+        // Parser le jour
+        final jour = int.tryParse(jourPart);
+        if (jour == null) {
+          throw ArgumentError('Jour non reconnu: $jourPart');
+        }
+        
+        // Parser l'année
+        final annee = int.tryParse(anneePart);
+        if (annee == null) {
+          throw ArgumentError('Année non reconnue: $anneePart');
+        }
+        
+        // Parser le mois
+        final moisNoms = [
+          'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+          'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+        ];
+        
+        final moisIndex = moisNoms.indexOf(moisPart);
+        if (moisIndex == -1) {
+          throw ArgumentError('Mois non reconnu: $moisPart');
+        }
+        
+        return DatePartielle(
+          annee: annee,
+          mois: moisIndex + 1,
+          jour: jour,
+        );
+      }
+      
+      // Format "janvier 1999"
       if (parts.length == 2) {
         final moisPart = parts[0].toLowerCase();
         final anneePart = parts[1];

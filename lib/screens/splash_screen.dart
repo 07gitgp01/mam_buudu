@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'wizard_screen.dart';
-import 'home_screen.dart';
+import '../navigation/family_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -37,9 +37,9 @@ class _SplashScreenState extends State<SplashScreen> {
       }
       
       if (wizardCompleted) {
-        print('🏠 Navigation vers HomeScreen...');
+        print('🏠 Navigation vers FamilyNavigation...');
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const FamilyNavigation()),
         );
       } else {
         print('🧙‍♂️ Navigation vers WizardScreen...');
@@ -49,10 +49,10 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     } catch (e) {
       print('❌ Erreur: $e');
-      // En cas d'erreur, aller vers HomeScreen par défaut
+      // En cas d'erreur, aller vers FamilyNavigation par défaut
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const FamilyNavigation()),
         );
       }
     }

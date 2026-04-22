@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'database/database_helper.dart';
+// import 'services/notification_local_service.dart';
 import 'models/union.dart';
 import 'screens/landing_screen.dart';
 import 'screens/wizard_screen.dart';
@@ -13,7 +13,12 @@ import 'screens/livret_screen.dart';
 import 'screens/auth/auth_splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
+// import 'screens/notifications_screen.dart';
 import 'services/notification_service.dart';
+import 'theme/family_connect_theme.dart';
+import 'navigation/family_navigation.dart';
+import 'widgets/modern_search_screen.dart';
+import 'widgets/family_profile_screen.dart';
 
 void main() async {
   print('=== MAIN START ===');
@@ -24,6 +29,14 @@ void main() async {
   print('Initializing database...');
   await DatabaseHelper.instance.database;
   print('Database initialization completed');
+  
+  // Initialisation du service de notifications
+  // print('Initializing notifications...');
+  // await NotificationLocalService().initialize(userId: 'default_user');
+  // print('Notifications initialized');
+  
+  // Vérifier les notifications à envoyer
+  // await NotificationLocalService().checkAndSendNotifications();
   
   print('Starting app...');
   runApp(const MyApp());
@@ -46,99 +59,9 @@ class MyApp extends StatelessWidget {
         Locale('fr', 'FR'),
         Locale('en', 'US'),
       ],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)),
-        useMaterial3: true,
-        brightness: Brightness.light,
-        textTheme: GoogleFonts.poppinsTextTheme(
-          Theme.of(context).textTheme.copyWith(
-            headlineLarge: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A237E),
-            ),
-            headlineMedium: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A237E),
-            ),
-            bodyLarge: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF424242),
-            ),
-            bodyMedium: const TextStyle(
-              fontSize: 16,
-              color: Color(0xFF424242),
-            ),
-            bodySmall: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF2E7D32),
-          foregroundColor: Colors.white,
-          elevation: 2,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2E7D32),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 4,
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        cardTheme: CardThemeData(
-          color: Colors.white,
-          elevation: 8,
-          shadowColor: Colors.black.withOpacity(0.1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          filled: true,
-          fillColor: Color(0xFFF8F9FA),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(color: Color(0xFFE0E0E0)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(color: Color(0xFFE0E0E0)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(color: Color(0xFF2E7D32), width: 2),
-          ),
-          labelStyle: TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-          hintStyle: TextStyle(
-            color: Color(0xFF9CA3AF),
-            fontSize: 14,
-          ),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-      ),
+      theme: FamilyConnectTheme.lightTheme,
+      darkTheme: FamilyConnectTheme.darkTheme,
+      themeMode: ThemeMode.system,
       initialRoute: '/auth_splash',
       routes: {
         '/auth_splash': (context) => const AuthSplashScreen(),
@@ -146,7 +69,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/wizard': (context) => const WizardScreen(),
-        '/home': (context) => const HomeScreen(),
+        '/home': (context) => const FamilyNavigation(),
         '/tree': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           if (args is String) {
@@ -171,6 +94,9 @@ class MyApp extends StatelessWidget {
           return const UnionFormScreen();
         },
         '/livret': (context) => const LivretScreen(),
+        '/search': (context) => const ModernSearchScreen(),
+        '/family': (context) => const FamilyProfileScreen(),
+        // '/notifications': (context) => const NotificationsScreen(),
       },
       debugShowCheckedModeBanner: false,
     );

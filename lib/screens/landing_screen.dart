@@ -65,10 +65,7 @@ class _LandingScreenState extends State<LandingScreen> {
         ),
         child: ElevatedButton(
           onPressed: () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-              (route) => false,
-            );
+            Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF2E7D32),
