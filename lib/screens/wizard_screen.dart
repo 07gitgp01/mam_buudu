@@ -376,7 +376,7 @@ class _WizardScreenState extends State<WizardScreen> {
           ),
         );
         
-        // Rediriger vers HomeScreen
+        // Rediriger vers FamilyNavigation
         Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
       }
     } catch (e) {

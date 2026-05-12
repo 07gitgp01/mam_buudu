@@ -10,6 +10,9 @@ import 'person_detail_screen.dart';
 import '../utils/gedcom_parser.dart';
 import '../utils/gedcom_exporter.dart';
 import 'landing_screen.dart';
+import '../widgets/enhanced_search_bar.dart';
+import '../widgets/instagram_person_card.dart';
+import '../navigation/family_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -371,19 +374,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 8),
                           // Bouton pour créer une union
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _navigateToAddUnion,
-                              icon: const Icon(Icons.favorite),
-                              label: const Text('Créer une union'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.pink[100],
-                                foregroundColor: Colors.pink[800],
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                            ),
-                          ),
+                          // SizedBox(
+                          //   width: double.infinity,
+                          //   child: ElevatedButton.icon(
+                          //     onPressed: _navigateToAddUnion,
+                          //     icon: const Icon(Icons.favorite),
+                          //     label: const Text('Créer une union'),
+                          //     style: ElevatedButton.styleFrom(
+                          //       backgroundColor: Colors.pink[100],
+                          //       foregroundColor: Colors.pink[800],
+                          //       padding: const EdgeInsets.symmetric(vertical: 12),
+                          //     ),
+                          //   ),
+                          // ),
                         ],
                       ),
                     ),
@@ -403,11 +406,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-    floatingActionButton: FloatingActionButton(
-      onPressed: _navigateToAddPersonne,
-      backgroundColor: Theme.of(context).primaryColor,
-      child: const Icon(Icons.person_add),
-    ),
+      // floatingActionButton: FloatingActionButton(
+      //   onPressed: _navigateToAddPersonne,
+      //   backgroundColor: Theme.of(context).primaryColor,
+      //   child: const Icon(Icons.person_add),
+      // ),
     );
   }
 
@@ -706,5 +709,21 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     }
+  }
+
+  void _sharePerson(Personne personne) {
+    // Implémentation du partage
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Partage de ${personne.nomComplet} bientôt disponible !'),
+        backgroundColor: Colors.blue,
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
   }
 }

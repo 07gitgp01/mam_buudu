@@ -74,10 +74,7 @@ class _AuthSplashScreenState extends State<AuthSplashScreen>
       
       if (hasSession) {
         // Utilisateur déjà connecté
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
+        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
       } else {
         // Utilisateur non connecté
         Navigator.of(context).pushAndRemoveUntil(

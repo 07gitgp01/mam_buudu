@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/personne.dart';
 import '../models/date_partielle.dart';
 import '../database/personne_repository.dart';
 import '../widgets/date_partielle_picker.dart';
 import '../widgets/photo_picker.dart';
 import '../services/notification_service.dart';
+// import '../services/notification_local_service.dart';
 
 class PersonFormScreen extends StatefulWidget {
   final Personne? personne;
@@ -18,6 +20,7 @@ class PersonFormScreen extends StatefulWidget {
 
 class _PersonFormScreenState extends State<PersonFormScreen> {
   final PersonneRepository _personneRepo = PersonneRepository();
+  // final NotificationLocalService _notificationService = NotificationLocalService();
   final Uuid _uuid = const Uuid();
   final _formKey = GlobalKey<FormState>();
 
@@ -330,9 +333,29 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
       if (widget.personne == null) {
         await _personneRepo.insert(personne);
         _showSuccessSnackBar('Personne créée avec succès !');
+        
+        // Planifier les notifications d'anniversaire si une date de naissance est définie
+        // if (personne.dateNaissance != null) {
+        //   try {
+        //     await _notificationService.scheduleBirthdayNotifications();
+        //     print('Notifications d\'anniversaire planifiées pour ${personne.nomComplet}');
+        //   } catch (e) {
+        //     print('Erreur lors de la planification des notifications: $e');
+        //   }
+        // }
       } else {
         await _personneRepo.update(personne);
         _showSuccessSnackBar('Personne mise à jour avec succès !');
+        
+        // Mettre à jour les notifications d'anniversaire si la date de naissance a changé
+        // if (personne.dateNaissance != null) {
+        //   try {
+        //     await _notificationService.scheduleBirthdayNotifications();
+        //     print('Notifications d\'anniversaire mises à jour pour ${personne.nomComplet}');
+        //   } catch (e) {
+        //     print('Erreur lors de la mise à jour des notifications: $e');
+        //   }
+        // }
       }
 
       if (mounted) {
