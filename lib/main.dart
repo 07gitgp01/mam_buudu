@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'database/database_helper.dart';
 // import 'services/notification_local_service.dart';
 import 'models/union.dart';
@@ -19,16 +20,22 @@ import 'theme/family_connect_theme.dart';
 import 'navigation/family_navigation.dart';
 import 'widgets/modern_search_screen.dart';
 import 'widgets/family_profile_screen.dart';
+import 'screens/auth_test_screen.dart';
 
 void main() async {
   print('=== MAIN START ===');
   WidgetsFlutterBinding.ensureInitialized();
   print('Flutter binding initialized');
   
-  // Initialisation de la base de données
-  print('Initializing database...');
+  // Initialisation de Firebase
+  print('Initializing Firebase...');
+  await Firebase.initializeApp();
+  print('Firebase initialization completed');
+  
+  // Initialisation de la base de données locale
+  print('Initializing local database...');
   await DatabaseHelper.instance.database;
-  print('Database initialization completed');
+  print('Local database initialization completed');
   
   // Initialisation du service de notifications
   // print('Initializing notifications...');
@@ -96,6 +103,7 @@ class MyApp extends StatelessWidget {
         '/livret': (context) => const LivretScreen(),
         '/search': (context) => const ModernSearchScreen(),
         '/family': (context) => const FamilyProfileScreen(),
+        '/auth_test': (context) => const AuthTestScreen(),
         // '/notifications': (context) => const NotificationsScreen(),
       },
       debugShowCheckedModeBanner: false,

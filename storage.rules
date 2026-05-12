@@ -1,0 +1,142 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ============================================
+    // PHOTOS DE PROFIL
+    // ============================================
+    match /profile_photos/{userId}/{allPaths=**} {
+      // Seul l'utilisateur concerné peut lire et écrire ses photos de profil
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Validation du type de fichier (images uniquement)
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024; // 5MB max
+    }
+
+    // ============================================
+    // PHOTOS DE PERSONNES
+    // ============================================
+    match /person_photos/{userId}/{allPaths=**} {
+      // Seul l'utilisateur concerné peut lire et écrire les photos de ses personnes
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Validation du type de fichier (images uniquement)
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size < 10 * 1024 * 1024; // 10MB max
+    }
+
+    // ============================================
+    // DOCUMENTS FAMILIAUX
+    // ============================================
+    match /family_documents/{userId}/{allPaths=**} {
+      // Seul l'utilisateur concerné peut lire et écrire ses documents
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Validation du type de fichier
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && (
+          request.resource.contentType.matches('image/.*') ||
+          request.resource.contentType.matches('application/pdf') ||
+          request.resource.contentType.matches('application/msword') ||
+          request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+          request.resource.contentType.matches('text/plain')
+        )
+        && request.resource.size < 20 * 1024 * 1024; // 20MB max
+    }
+
+    // ============================================
+    // FICHIERS GEDCOM
+    // ============================================
+    match /gedcom_files/{userId}/{allPaths=**} {
+      // Seul l'utilisateur concerné peut lire et écrire ses fichiers GEDCOM
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Validation du type de fichier (GEDCOM uniquement)
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && (
+          request.resource.contentType == 'text/plain' ||
+          request.resource.contentType == 'application/octet-stream'
+        )
+        && request.resource.size < 50 * 1024 * 1024; // 50MB max
+    }
+
+    // ============================================
+    // PHOTOS DE STORIES
+    // ============================================
+    match /story_photos/{userId}/{allPaths=**} {
+      // Seul l'utilisateur concerné peut lire et écrire les photos de ses stories
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Validation du type de fichier (images uniquement)
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size < 10 * 1024 * 1024; // 10MB max
+    }
+
+    // ============================================
+    // AVATARS TEMPORAIRES
+    // ============================================
+    match /temp_avatars/{userId}/{allPaths=**} {
+      // Seul l'utilisateur concerné peut lire et écrire ses avatars temporaires
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Validation du type de fichier (images uniquement)
+      allow write: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size < 2 * 1024 * 1024; // 2MB max
+    }
+
+    // ============================================
+    // BACKUPS
+    // ============================================
+    match /backups/{userId}/{allPaths=**} {
+      // Seul l'utilisateur concerné peut lire et écrire ses backups
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Pas de restriction de taille pour les backups
+      // mais validation que c'est bien l'utilisateur concerné
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // FONCTIONS UTILITAIRES
+    // ============================================
+    
+    function isOwner() {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isDocument() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+             request.resource.contentType.matches('text/plain');
+    }
+    
+    function isGedcom() {
+      return request.resource.contentType == 'text/plain' ||
+             request.resource.contentType == 'application/octet-stream';
+    }
+    
+    function isValidImageSize(maxSizeMB) {
+      return isImage() && request.resource.size < maxSizeMB * 1024 * 1024;
+    }
+    
+    function isValidDocumentSize(maxSizeMB) {
+      return isDocument() && request.resource.size < maxSizeMB * 1024 * 1024;
+    }
+  }
+}

@@ -1,0 +1,252 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // UTILISATEURS
+    // ============================================
+    match /utilisateurs/{userId} {
+      // Seul l'utilisateur propriétaire peut lire et modifier son profil
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Tout utilisateur authentifié peut créer son propre profil
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // PERSONNES
+    // ============================================
+    match /personnes/{personneId} {
+      // Tout utilisateur authentifié peut lire les personnes
+      allow read: if request.auth != null;
+      
+      // Tout utilisateur authentifié peut créer des personnes
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut modifier une personne
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut supprimer une personne
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+    }
+
+    // ============================================
+    // UNIONS
+    // ============================================
+    match /unions/{unionId} {
+      // Tout utilisateur authentifié peut lire les unions
+      allow read: if request.auth != null;
+      
+      // Tout utilisateur authentifié peut créer des unions
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut modifier une union
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut supprimer une union
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+    }
+
+    // ============================================
+    // FILIATIONS
+    // ============================================
+    match /filiations/{filiationId} {
+      // Tout utilisateur authentifié peut lire les filiations
+      allow read: if request.auth != null;
+      
+      // Tout utilisateur authentifié peut créer des filiations
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut modifier une filiation
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut supprimer une filiation
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+    }
+
+    // ============================================
+    // FAMILLES
+    // ============================================
+    match /familles/{familleId} {
+      // Les membres de la famille peuvent lire les informations
+      allow read: if request.auth != null 
+        && request.auth.uid in resource.data.membres;
+      
+      // Tout utilisateur authentifié peut créer une famille
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut modifier la famille
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut supprimer la famille
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+    }
+
+    // ============================================
+    // PHOTOS
+    // ============================================
+    match /photos/{photoId} {
+      // Tout utilisateur authentifié peut voir les photos
+      allow read: if request.auth != null;
+      
+      // Seul le propriétaire peut uploader des photos
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.uploaded_by;
+      
+      // Seul le propriétaire peut modifier les métadonnées
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.uploaded_by;
+      
+      // Seul le propriétaire peut supprimer les photos
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.uploaded_by;
+    }
+
+    // ============================================
+    // DOCUMENTS
+    // ============================================
+    match /documents/{documentId} {
+      // Les membres de la famille peuvent lire les documents
+      allow read: if request.auth != null 
+        && request.auth.uid in resource.data.famille_membres;
+      
+      // Seul le propriétaire peut uploader des documents
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.uploaded_by;
+      
+      // Seul le propriétaire peut modifier les documents
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.uploaded_by;
+      
+      // Seul le propriétaire peut supprimer les documents
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.uploaded_by;
+    }
+
+    // ============================================
+    // STORIES
+    // ============================================
+    match /stories/{storyId} {
+      // Les membres de la famille peuvent voir les stories
+      allow read: if request.auth != null 
+        && request.auth.uid in resource.data.famille_membres;
+      
+      // Seul le créateur peut créer des stories
+      allow create: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut modifier ses stories
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut supprimer ses stories
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+    }
+
+    // ============================================
+    // TIMELINE
+    // ============================================
+    match /timeline/{eventId} {
+      // Les membres de la famille peuvent voir les événements
+      allow read: if request.auth != null 
+        && request.auth.uid in resource.data.famille_membres;
+      
+      // Les membres de la famille peuvent créer des événements
+      allow create: if request.auth != null 
+        && request.auth.uid in resource.data.famille_membres;
+      
+      // Seul le créateur peut modifier ses événements
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+      
+      // Seul le créateur peut supprimer ses événements
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.created_by;
+    }
+
+    // ============================================
+    // GAMIFICATION
+    // ============================================
+    match /gamification/{userId} {
+      // Seul l'utilisateur concerné peut lire et modifier ses données de gamification
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // COMMENTAIRES
+    // ============================================
+    match /comments/{commentId} {
+      // Les membres de la famille peuvent lire les commentaires
+      allow read: if request.auth != null 
+        && request.auth.uid in resource.data.famille_membres;
+      
+      // Les membres de la famille peuvent créer des commentaires
+      allow create: if request.auth != null 
+        && request.auth.uid in resource.data.famille_membres;
+      
+      // Seul l'auteur peut modifier ses commentaires
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.author_id;
+      
+      // Seul l'auteur peut supprimer ses commentaires
+      allow delete: if request.auth != null 
+        && request.auth.uid == resource.data.author_id;
+    }
+
+    // ============================================
+    // RÈGLES DE VALIDATION DES DONNÉES
+    // ============================================
+    
+    // Validation pour les personnes
+    match /personnes/{personneId} {
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.created_by
+        && request.resource.data.keys().hasAll(['id', 'created_by', 'created_at'])
+        && request.resource.data.id is string
+        && request.resource.data.created_by is string
+        && request.resource.data.created_at is timestamp;
+    }
+
+    // Validation pour les unions
+    match /unions/{unionId} {
+      allow create: if request.auth != null 
+        && request.auth.uid == request.resource.data.created_by
+        && request.resource.data.keys().hasAll(['id', 'personne1_id', 'personne2_id', 'created_by', 'created_at'])
+        && request.resource.data.id is string
+        && request.resource.data.personne1_id is string
+        && request.resource.data.personne2_id is string
+        && request.resource.data.created_by is string
+        && request.resource.data.created_at is timestamp
+        && request.resource.data.personne1_id != request.resource.data.personne2_id;
+    }
+
+    // ============================================
+    // FONCTIONS UTILITAIRES
+    // ============================================
+    
+    function isOwner() {
+      return request.auth != null && request.auth.uid == resource.data.created_by;
+    }
+    
+    function isFamilyMember() {
+      return request.auth != null && request.auth.uid in resource.data.famille_membres;
+    }
+    
+    function isValidTimestamp() {
+      return request.resource.data.created_at is timestamp;
+    }
+  }
+}

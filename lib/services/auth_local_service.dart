@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/utilisateur.dart';
+import '../models/utilisateur_local.dart';
 import '../database/database_helper.dart';
 
 class AuthLocalService {
@@ -11,13 +12,13 @@ class AuthLocalService {
   AuthLocalService._internal();
 
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
-  Utilisateur? _currentUser;
+  UtilisateurLocal? _currentUser;
   static const String _currentUserKey = 'current_user_id';
   static const String _sessionTimeoutKey = 'session_timeout';
   static const Duration _sessionTimeout = Duration(days: 7);
 
   // Getters
-  Utilisateur? get currentUser => _currentUser;
+  UtilisateurLocal? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
   bool get isAdmin => _currentUser?.estAdmin ?? false;
 
@@ -75,7 +76,7 @@ class AuthLocalService {
       }
 
       // Créer le nouvel utilisateur
-      final utilisateur = Utilisateur(
+      final utilisateur = UtilisateurLocal(
         id: _generateId(),
         email: email,
         motDePasse: hashPassword(password),
@@ -111,7 +112,7 @@ class AuthLocalService {
         throw Exception('Email ou mot de passe incorrect');
       }
 
-      final utilisateur = Utilisateur.fromMap(result.first);
+      final utilisateur = UtilisateurLocal.fromMap(result.first);
       
       if (!verifyPassword(password, utilisateur.motDePasse)) {
         throw Exception('Email ou mot de passe incorrect');
@@ -204,7 +205,7 @@ class AuthLocalService {
         return false;
       }
 
-      _currentUser = Utilisateur.fromMap(result.first);
+      _currentUser = UtilisateurLocal.fromMap(result.first);
       
       // Étendre la session
       await prefs.setInt(_sessionTimeoutKey, 
@@ -218,7 +219,7 @@ class AuthLocalService {
   }
 
   // Récupération de l'utilisateur courant
-  Future<Utilisateur?> getCurrentUser() async {
+  Future<UtilisateurLocal?> getCurrentUser() async {
     if (_currentUser != null) {
       return _currentUser;
     }
@@ -242,7 +243,7 @@ class AuthLocalService {
         throw Exception('Aucun utilisateur trouvé avec cet email');
       }
 
-      final utilisateur = Utilisateur.fromMap(result.first);
+      final utilisateur = UtilisateurLocal.fromMap(result.first);
       
       if (utilisateur.questionSecrete == null || utilisateur.reponseSecrete == null) {
         throw Exception('Aucune question secrète configurée pour cet utilisateur');
@@ -288,11 +289,11 @@ class AuthLocalService {
   }
 
   // Liste des utilisateurs (pour admin)
-  Future<List<Utilisateur>> getAllUsers() async {
+  Future<List<UtilisateurLocal>> getAllUsers() async {
     try {
       final db = await _dbHelper.database;
       final result = await db.query('utilisateurs', orderBy: 'created_at DESC');
-      return result.map((map) => Utilisateur.fromMap(map)).toList();
+      return result.map((map) => UtilisateurLocal.fromMap(map)).toList();
     } catch (e) {
       print('Erreur lors de la récupération des utilisateurs: $e');
       return [];
