@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/family_connect_theme.dart';
@@ -10,6 +11,7 @@ import '../widgets/loading_animations.dart';
 import '../widgets/gamification_widgets.dart';
 import '../services/gamification_service.dart';
 import '../models/gamification.dart';
+import '../screens/tree_screen.dart';
 
 /// Écran d'accueil moderne avec switch liste/card
 class ModernHomeScreen extends StatefulWidget {
@@ -157,6 +159,21 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     }
   }
 
+  void _navigateToTree() {
+    if (_personnes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ajoutez d\'abord des membres à votre famille.')),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TreeScreen(racineId: _personnes.first.id),
+      ),
+    );
+  }
+
   void _navigateToPersonneDetail(Personne personne) async {
     final result = await Navigator.push(
       context,
@@ -242,11 +259,11 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToAddPersonne,
-        backgroundColor: FamilyConnectTheme.primaryColor,
-        child: const Icon(Icons.person_add, color: Colors.white),
-      ),
+      // floatingActionButton: FloatingActionButton(
+      //   onPressed: _navigateToAddPersonne,
+      //   backgroundColor: FamilyConnectTheme.primaryColor,
+      //   child: const Icon(Icons.person_add, color: Colors.white),
+      // ),
     );
   }
 
@@ -254,7 +271,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -323,9 +340,39 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
               ),
             ],
           ),
-          
+
+          const SizedBox(height: 12),
+
+          // Bouton Arbre généalogique (pleine largeur)
+          GestureDetector(
+            onTap: _navigateToTree,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                gradient: FamilyConnectTheme.secondaryGradient,
+                borderRadius: FamilyConnectTheme.radiusMd,
+                boxShadow: FamilyConnectTheme.shadowSm,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.account_tree, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Voir l\'arbre généalogique',
+                    style: FamilyConnectTheme.bodyMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
           const SizedBox(height: 16),
-          
+
           // Barre de recherche
           TextField(
             controller: _searchController,
@@ -431,7 +478,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Theme.of(context).colorScheme.surfaceVariant,
+            Theme.of(context).colorScheme.surfaceContainerHighest,
             Theme.of(context).colorScheme.surface,
           ],
         ),
@@ -447,24 +494,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Avatar
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: FamilyConnectTheme.primaryGradient,
-                    borderRadius: FamilyConnectTheme.radiusFull,
-                  ),
-                  child: Center(
-                    child: Text(
-                      _getInitials(personne.nomComplet),
-                      style: FamilyConnectTheme.bodyMedium.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
+                // Avatar (photo ou initiales)
+                _buildPersonAvatar(personne, size: 50),
                 
                 const SizedBox(width: 16),
                 
@@ -500,6 +531,49 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonAvatar(Personne personne, {double size = 50}) {
+    final hasPhoto = personne.photoPath != null && personne.photoPath!.isNotEmpty;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: FamilyConnectTheme.primaryGradient,
+        borderRadius: FamilyConnectTheme.radiusFull,
+        boxShadow: FamilyConnectTheme.shadowSm,
+      ),
+      child: ClipRRect(
+        borderRadius: FamilyConnectTheme.radiusFull,
+        child: hasPhoto
+            ? Image.file(
+                File(personne.photoPath!),
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _avatarInitiales(personne, size),
+              )
+            : _avatarInitiales(personne, size),
+      ),
+    );
+  }
+
+  Widget _avatarInitiales(Personne personne, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(gradient: FamilyConnectTheme.primaryGradient),
+      child: Center(
+        child: Text(
+          _getInitials(personne.nomComplet),
+          style: FamilyConnectTheme.bodyMedium.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: size * 0.28,
           ),
         ),
       ),

@@ -229,5 +229,10 @@ class ArbrePainter extends CustomPainter {
   }
   
   @override
-  bool shouldRepaint(ArbrePainter oldDelegate) => true;
+  bool shouldRepaint(ArbrePainter oldDelegate) {
+    return oldDelegate.positions != positions ||
+        oldDelegate.graphe != graphe ||
+        oldDelegate.personnes != personnes ||
+        oldDelegate.unions != unions;
+  }
 }

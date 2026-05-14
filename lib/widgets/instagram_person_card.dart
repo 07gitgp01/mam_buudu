@@ -198,7 +198,7 @@ class _InstagramPersonCardState extends State<InstagramPersonCard>
                 ],
               ),
               child: Material(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: FamilyConnectTheme.radiusLg,
                 child: GestureDetector(
                   onTapDown: _onTapDown,
@@ -222,7 +222,7 @@ class _InstagramPersonCardState extends State<InstagramPersonCard>
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                Theme.of(context).colorScheme.surfaceVariant,
+                                Theme.of(context).colorScheme.surfaceContainerHighest,
                                 Theme.of(context).colorScheme.surface,
                               ],
                             ),
@@ -377,7 +377,7 @@ class _InstagramPersonCardState extends State<InstagramPersonCard>
                   color: FamilyConnectTheme.errorColor,
                   borderRadius: FamilyConnectTheme.radiusFull,
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     width: 2,
                   ),
                 ),
@@ -486,7 +486,7 @@ class _InstagramPersonCardState extends State<InstagramPersonCard>
         Icons.more_horiz,
         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
       ),
-      color: Theme.of(context).colorScheme.surfaceVariant,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
         borderRadius: FamilyConnectTheme.radiusMd,
       ),
@@ -576,26 +576,30 @@ class _InstagramPersonCardState extends State<InstagramPersonCard>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildActionButton(
-            icon: Icons.favorite_border,
-            label: 'Aimer',
-            onTap: () {
-              HapticFeedback.lightImpact();
-              // Action liker
-            },
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.favorite_border,
+              label: 'Aimer',
+              onTap: () {
+                HapticFeedback.lightImpact();
+              },
+            ),
           ),
-          _buildActionButton(
-            icon: Icons.comment_outlined,
-            label: 'Commenter',
-            onTap: () {
-              HapticFeedback.lightImpact();
-              // Action commenter
-            },
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.comment_outlined,
+              label: 'Commenter',
+              onTap: () {
+                HapticFeedback.lightImpact();
+              },
+            ),
           ),
-          _buildActionButton(
-            icon: Icons.share_outlined,
-            label: 'Partager',
-            onTap: widget.onShare,
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.share_outlined,
+              label: 'Partager',
+              onTap: widget.onShare,
+            ),
           ),
         ],
       ),
@@ -613,20 +617,24 @@ class _InstagramPersonCardState extends State<InstagramPersonCard>
         onTap: onTap,
         borderRadius: FamilyConnectTheme.radiusSm,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 icon,
-                size: 20,
+                size: 18,
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: FamilyConnectTheme.caption.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: FamilyConnectTheme.caption.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
               ),
             ],

@@ -4,15 +4,13 @@ import '../theme/family_connect_theme.dart';
 import '../screens/tree_screen.dart';
 import '../screens/person_form_screen.dart';
 import '../screens/union_form_screen.dart';
-import '../screens/livret_screen.dart';
 import '../widgets/modern_home_screen.dart';
 import '../widgets/modern_search_screen.dart';
 import '../widgets/family_profile_screen.dart';
-import '../widgets/gamification_screen.dart';
 import '../stories/family_stories_screen.dart';
 import '../screens/timeline_screen.dart';
 import '../screens/family_games_screen.dart';
-import 'dart:math' as math;
+import '../services/auth_local_service.dart';
 
 /// Élément de navigation pour la barre inférieure
 class NavigationItem {
@@ -43,44 +41,12 @@ class _FamilyNavigationState extends State<FamilyNavigation>
   
   late PageController _pageController;
   late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  
+
   int _currentIndex = 0;
   bool _isAnimating = false;
-  
-  final List<NavigationItem> _navigationItems = [
-    NavigationItem(
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home,
-      label: 'Accueil',
-      index: 0,
-    ),
-    NavigationItem(
-      icon: Icons.search_outlined,
-      activeIcon: Icons.search,
-      label: 'Rechercher',
-      index: 1,
-    ),
-    NavigationItem(
-      icon: Icons.people_outline,
-      activeIcon: Icons.people,
-      label: 'Famille',
-      index: 2,
-    ),
-    NavigationItem(
-      icon: Icons.camera_alt_outlined,
-      activeIcon: Icons.camera_alt,
-      label: 'Stories',
-      index: 3,
-    ),
-    NavigationItem(
-      icon: Icons.timeline_outlined,
-      activeIcon: Icons.timeline,
-      label: 'Timeline',
-      index: 4,
-    ),
-  ];
+
+  final AuthLocalService _authService = AuthLocalService();
   
   // Badges de notification
   final Map<int, bool> _badgeStates = {
@@ -101,14 +67,6 @@ class _FamilyNavigationState extends State<FamilyNavigation>
       duration: FamilyConnectTheme.normalDuration,
       vsync: this,
     );
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: FamilyConnectTheme.defaultCurve,
-    ));
     
     _scaleAnimation = Tween<double>(
       begin: 0.8,
@@ -185,7 +143,7 @@ class _FamilyNavigationState extends State<FamilyNavigation>
   /// Construire l'AppBar avec menu hamburger et profil
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       elevation: 0,
       automaticallyImplyLeading: false,
       title: Row(
@@ -537,7 +495,7 @@ class _FamilyNavigationState extends State<FamilyNavigation>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -703,12 +661,13 @@ class _FamilyNavigationState extends State<FamilyNavigation>
             child: const Text('Annuler'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implémenter la déconnexion
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Déconnexion bientôt disponible')),
-              );
+            onPressed: () async {
+              final nav = Navigator.of(context);
+              nav.pop();
+              await _authService.logout();
+              if (mounted) {
+                nav.pushNamedAndRemoveUntil('/landing', (route) => false);
+              }
             },
             child: const Text('Se déconnecter', style: TextStyle(color: Colors.red)),
           ),
@@ -1026,7 +985,7 @@ class _FamilyNavigationState extends State<FamilyNavigation>
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: FamilyConnectTheme.radiusMd,
           ),
           child: Column(
@@ -1069,33 +1028,6 @@ class _FamilyNavigationState extends State<FamilyNavigation>
   
   Widget _buildFamilyPage() {
     return const FamilyProfileScreen();
-  }
-  
-  Widget _buildProfilePage() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Text(
-            'Profil',
-            style: FamilyConnectTheme.h2.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Center(
-              child: Text(
-                'Page profil en construction...',
-                style: FamilyConnectTheme.bodyMedium.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
   
   Widget _buildStoriesPage() {
