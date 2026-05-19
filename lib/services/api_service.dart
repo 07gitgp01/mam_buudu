@@ -14,7 +14,7 @@ class FamilleInfo {
 }
 
 class ApiService {
-  static const String _baseUrl = 'http://10.10.0.34:3000';
+  static const String _baseUrl = 'http://192.168.1.70:3000';
   static const Duration _timeout = Duration(seconds: 15);
 
   // ── Token JWT ────────────────────────────────────────────────────────────────
@@ -29,7 +29,6 @@ class ApiService {
     await prefs.setString('api_token', token);
   }
 
-  /// Vérifie si le token existe et que la session n'a pas expiré (< 1 jour)
   static Future<bool> isSessionValid() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('api_token');
@@ -39,20 +38,27 @@ class ApiService {
     return DateTime.now().millisecondsSinceEpoch < expiry;
   }
 
+  static Future<bool> isViewonly() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('api_is_viewonly') ?? false;
+  }
+
+  static Future<bool> hasCompletedProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('api_profile_complete') ?? true;
+  }
+
   static Future<void> clearToken() async {
     await DatabaseHelper.instance.clearFamilyData();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('api_token');
-    await prefs.remove('api_famille_id');
-    await prefs.remove('api_user_id');
-    await prefs.remove('api_user_role');
-    await prefs.remove('api_session_expiry');
-    await prefs.remove('api_user_nom');
-    await prefs.remove('api_user_prenom');
-    await prefs.remove('api_user_email');
-    await prefs.remove('api_user_telephone');
-    await prefs.remove('api_famille_nom');
-    await prefs.remove('api_famille_code');
+    for (final key in [
+      'api_token', 'api_famille_id', 'api_user_id', 'api_user_role',
+      'api_session_expiry', 'api_user_nom', 'api_user_prenom',
+      'api_user_email', 'api_user_telephone', 'api_famille_nom',
+      'api_famille_code', 'api_is_viewonly', 'api_profile_complete',
+    ]) {
+      await prefs.remove(key);
+    }
   }
 
   static Future<Map<String, String>> _authHeaders() async {
@@ -67,24 +73,40 @@ class ApiService {
     await saveToken(body['token'] as String);
     final prefs = await SharedPreferences.getInstance();
 
-    final nouvelleFamilleId = (body['famille'] as Map)['id'] as String;
-    final ancienneFamilleId = prefs.getString('api_famille_id');
+    final isViewonlySession = body['isViewonly'] == true;
+    await prefs.setBool('api_is_viewonly', isViewonlySession);
 
-    // Si la famille change, purger les données locales de l'ancienne famille
-    if (ancienneFamilleId != null && ancienneFamilleId != nouvelleFamilleId) {
-      await DatabaseHelper.instance.clearFamilyData();
+    final famille = body['famille'] as Map;
+    final nouvelleFamilleId = famille['id'] as String;
+
+    if (!isViewonlySession) {
+      final ancienneFamilleId = prefs.getString('api_famille_id');
+      if (ancienneFamilleId != null && ancienneFamilleId != nouvelleFamilleId) {
+        await DatabaseHelper.instance.clearFamilyData();
+      }
     }
 
-    // Session valide 1 jour à partir de maintenant
     await prefs.setInt(
       'api_session_expiry',
       DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch,
     );
 
-    final user = body['user'] as Map;
-    final famille = body['famille'] as Map;
-    await prefs.setString('api_user_id', user['id'] as String);
     await prefs.setString('api_famille_id', nouvelleFamilleId);
+    await prefs.setString('api_famille_nom', famille['nom'] as String? ?? '');
+    final code = famille['codeUnique'] as String?;
+    if (code != null) await prefs.setString('api_famille_code', code);
+
+    if (isViewonlySession) {
+      await prefs.setString('api_user_id', 'viewonly');
+      await prefs.setString('api_user_nom', famille['nom'] as String? ?? '');
+      await prefs.setString('api_user_prenom', 'Accès');
+      await prefs.setString('api_user_role', 'viewonly');
+      await prefs.setBool('api_profile_complete', true);
+      return;
+    }
+
+    final user = body['user'] as Map;
+    await prefs.setString('api_user_id', user['id'] as String);
     await prefs.setString('api_user_nom', user['nom'] as String? ?? '');
     await prefs.setString('api_user_prenom', user['prenom'] as String? ?? '');
     await prefs.setString('api_user_email', user['email'] as String? ?? '');
@@ -92,17 +114,16 @@ class ApiService {
     if (tel != null) await prefs.setString('api_user_telephone', tel);
     final role = user['role'] as String?;
     if (role != null) await prefs.setString('api_user_role', role);
-    await prefs.setString('api_famille_nom', famille['nom'] as String? ?? '');
-    final code = famille['codeUnique'] as String?;
-    if (code != null) await prefs.setString('api_famille_code', code);
+
+    final completed = user['hasCompletedProfile'] as bool? ?? true;
+    await prefs.setBool('api_profile_complete', completed);
   }
 
   // ── Auth ─────────────────────────────────────────────────────────────────────
 
-  /// Création d'une famille + compte administrateur
   static Future<String?> register({
     required String nomFamille,
-    String? codeUnique,       // null = auto-généré par le serveur
+    String? codeUnique,
     String? lieu,
     required String email,
     String? telephone,
@@ -146,11 +167,13 @@ class ApiService {
     }
   }
 
-  /// Connexion avec code famille + email/téléphone + mot de passe
+  /// Login unifié — passe exactement l'un des champs email/telephone/username.
   static Future<String?> login({
     required String familleCode,
-    required String identifiant, // email ou numéro de téléphone
     required String password,
+    String? email,
+    String? telephone,
+    String? username,
   }) async {
     try {
       final response = await http
@@ -159,8 +182,10 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'familleCode': familleCode,
-              'identifiant': identifiant,
               'password': password,
+              if (email != null) 'email': email,
+              if (telephone != null) 'telephone': telephone,
+              if (username != null) 'username': username,
             }),
           )
           .timeout(_timeout);
@@ -179,7 +204,6 @@ class ApiService {
     }
   }
 
-  /// Réinitialisation mot de passe
   static Future<String?> resetPassword({
     required String email,
     required String questionSecrete,
@@ -208,7 +232,47 @@ class ApiService {
     }
   }
 
-  /// Recherche de familles par nom (pour l'autocomplete de connexion)
+  static Future<String?> completeProfile({
+    required String questionSecrete,
+    required String reponseSecrete,
+    String? telephone,
+    String? email,
+  }) async {
+    try {
+      final response = await post('/api/auth/complete-profile', {
+        'questionSecrete': questionSecrete,
+        'reponseSecrete': reponseSecrete,
+        if (telephone != null && telephone.isNotEmpty) 'telephone': telephone,
+        if (email != null && email.isNotEmpty) 'email': email,
+      });
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('api_profile_complete', true);
+        return null;
+      }
+      return body['error'] as String? ?? 'Erreur';
+    } catch (e) {
+      return 'Erreur réseau : $e';
+    }
+  }
+
+  /// Retourne les accès viewonly de la famille (admin/gestionnaire)
+  static Future<Map<String, String>?> getViewonlyCredentials() async {
+    try {
+      final response = await get('/api/auth/viewonly-credentials');
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return {
+        'username': body['viewonlyUsername'] as String? ?? '',
+        'password': body['viewonlyPassword'] as String? ?? '',
+        'familleCode': body['familleCode'] as String? ?? '',
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<List<FamilleInfo>> searchFamilles(String query) async {
     if (query.trim().isEmpty) return [];
     try {
@@ -223,7 +287,6 @@ class ApiService {
     }
   }
 
-  /// Vérifie un code famille et retourne les infos basiques
   static Future<FamilleInfo?> getFamilleByCode(String code) async {
     try {
       final response = await http
@@ -236,28 +299,26 @@ class ApiService {
     }
   }
 
-  /// Admin/gestionnaire crée un compte login pour un membre de la famille
+  /// Admin/gestionnaire crée un compte pour un membre de la famille.
+  /// Seuls telephone + password sont obligatoires ; la question secrète est
+  /// demandée au membre lui-même à sa première connexion.
   static Future<String?> createMembre({
-    required String email,
-    String? telephone,
+    required String telephone,
+    String? email,
     required String password,
     required String nom,
     required String prenom,
-    required String role, // 'gestionnaire' ou 'membre'
-    required String questionSecrete,
-    required String reponseSecrete,
-    String? personneId, // lien vers l'arbre généalogique (optionnel)
+    required String role,
+    String? personneId,
   }) async {
     try {
       final response = await post('/api/auth/membres/create', {
-        'email': email,
-        if (telephone != null) 'telephone': telephone,
+        'telephone': telephone,
+        if (email != null && email.isNotEmpty) 'email': email,
         'password': password,
         'nom': nom,
         'prenom': prenom,
         'role': role,
-        'questionSecrete': questionSecrete,
-        'reponseSecrete': reponseSecrete,
         if (personneId != null) 'personneId': personneId,
       });
       final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -268,14 +329,13 @@ class ApiService {
     }
   }
 
-  /// Vérifie si le user connecté peut éditer/créer des données
   static Future<bool> userCanEdit() async {
     final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('api_is_viewonly') == true) return false;
     final role = prefs.getString('api_user_role') ?? '';
     return role == 'admin' || role == 'gestionnaire';
   }
 
-  /// Liste les membres de la famille active (throws on error)
   static Future<List<Map<String, dynamic>>> getFamilleMembers() async {
     final response = await get('/api/familles/current');
     if (response.statusCode != 200) {
@@ -287,10 +347,9 @@ class ApiService {
     return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
-  /// Change le rôle d'un membre (admin/gestionnaire uniquement)
   static Future<String?> changeMemberRole({
     required String userId,
-    required String role, // 'gestionnaire' ou 'membre'
+    required String role,
   }) async {
     try {
       final response = await patch('/api/familles/membres/$userId/role', {'role': role});
@@ -302,7 +361,6 @@ class ApiService {
     }
   }
 
-  /// Vérifie si le serveur est joignable
   static Future<bool> isServerReachable() async {
     try {
       final response = await http

@@ -6,6 +6,8 @@ import '../database/personne_repository.dart';
 import '../database/union_repository.dart';
 import '../models/personne.dart';
 import '../screens/person_detail_screen.dart';
+import '../services/api_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// Écran de profil familial moderne avec statistiques
 class FamilyProfileScreen extends StatefulWidget {
@@ -33,6 +35,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
   bool _statsLoaded = false;
   String _familleName = '';
   String _familleCode = '';
+  String _userRole = '';
+  String? _viewonlyUsername;
+  String? _viewonlyPassword;
+  bool _viewonlyVisible = true;
 
   @override
   void initState() {
@@ -75,7 +81,18 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
       setState(() {
         _familleName = prefs.getString('api_famille_nom') ?? '';
         _familleCode = prefs.getString('api_famille_code') ?? '';
+        _userRole    = prefs.getString('api_user_role') ?? '';
       });
+    }
+    // Charger les accès viewonly pour admin/gestionnaire
+    if (_userRole == 'admin' || _userRole == 'gestionnaire') {
+      final creds = await ApiService.getViewonlyCredentials();
+      if (mounted && creds != null) {
+        setState(() {
+          _viewonlyUsername = creds['username'];
+          _viewonlyPassword = creds['password'];
+        });
+      }
     }
   }
 
@@ -125,6 +142,10 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
               _buildHeader(),
               const SizedBox(height: 24),
               _buildFamilyOverview(),
+              if (_viewonlyUsername != null && _viewonlyUsername!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildViewonlyCard(),
+              ],
               const SizedBox(height: 24),
               _buildStatsGrid(),
               const SizedBox(height: 24),
@@ -206,6 +227,152 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
     );
   }
   
+  Widget _buildViewonlyCard() {
+    final theme = Theme.of(context);
+    final username = _viewonlyUsername ?? '';
+    final password = _viewonlyPassword ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: FamilyConnectTheme.radiusLg,
+        border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── En-tête ────────────────────────────────────────────────────
+          Row(children: [
+            Icon(Icons.visibility_outlined,
+                size: 16, color: theme.colorScheme.primary),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('Accès consultation (lecture seule)',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w700)),
+            ),
+            // Masquer / afficher le mot de passe
+            IconButton(
+              icon: Icon(
+                  _viewonlyVisible
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: 18,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+              onPressed: () =>
+                  setState(() => _viewonlyVisible = !_viewonlyVisible),
+              tooltip: _viewonlyVisible ? 'Masquer' : 'Afficher',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ]),
+          const SizedBox(height: 4),
+          Text(
+            "Partagez ces identifiants avec les membres qui souhaitent consulter l'arbre sans compte personnel.",
+            style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+          ),
+
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+
+          // ── Lignes de credentials ──────────────────────────────────────
+          _credRow(theme, 'Code famille', _familleCode),
+          const SizedBox(height: 8),
+          _credRow(theme, 'Identifiant', username),
+          const SizedBox(height: 8),
+          _credRow(
+            theme, 'Mot de passe',
+            _viewonlyVisible ? password : '••••••••',
+            copyValue: password,
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Bouton Partager ────────────────────────────────────────────
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonal(
+              onPressed: (username.isNotEmpty && password.isNotEmpty)
+                  ? () => _shareCredentials(username, password)
+                  : null,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.share_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('Partager les accès',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _shareCredentials(String username, String password) {
+    final text = '''🏠 Accès consultation — Famille $_familleName
+
+Connectez-vous sur l'application Mam Buudu avec ces identifiants (lecture seule) :
+
+• Code famille : $_familleCode
+• Identifiant  : $username
+• Mot de passe : $password
+
+⚠️ Ces accès permettent uniquement de consulter l'arbre généalogique.''';
+
+    Share.share(text);
+  }
+
+  Widget _credRow(ThemeData theme, String label, String value,
+      {String? copyValue}) {
+    final valToCopy = copyValue ?? value;
+    return Row(children: [
+      SizedBox(
+        width: 104,
+        child: Text(label,
+            style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55))),
+      ),
+      Expanded(
+        child: Text(
+          value,
+          style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: value.startsWith('•') ? 2 : 0),
+        ),
+      ),
+      GestureDetector(
+        onTap: () {
+          if (value.startsWith('•')) return; // ne pas copier si masqué
+          Clipboard.setData(ClipboardData(text: valToCopy));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('$label copié'),
+                duration: const Duration(seconds: 1),
+                behavior: SnackBarBehavior.floating),
+          );
+        },
+        child: Icon(
+          Icons.copy,
+          size: 16,
+          color: value.startsWith('•')
+              ? theme.colorScheme.outline.withValues(alpha: 0.3)
+              : theme.colorScheme.primary.withValues(alpha: 0.7),
+        ),
+      ),
+    ]);
+  }
+
   Widget _buildFamilyOverview() {
     return FadeTransition(
       opacity: _fadeAnimation,

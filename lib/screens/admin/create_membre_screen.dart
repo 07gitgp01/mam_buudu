@@ -1,56 +1,69 @@
 import 'package:flutter/material.dart';
 import '../../models/personne.dart';
 import '../../services/api_service.dart';
+import '../../widgets/phone_picker_field.dart';
 
 class CreateMembreScreen extends StatefulWidget {
-  final Personne personne;
-  const CreateMembreScreen({super.key, required this.personne});
+  /// Liste des personnes sans compte parmi lesquelles choisir.
+  final List<Personne> sansCompte;
+
+  const CreateMembreScreen({super.key, required this.sansCompte});
 
   @override
   State<CreateMembreScreen> createState() => _CreateMembreScreenState();
 }
 
 class _CreateMembreScreenState extends State<CreateMembreScreen> {
-  final _formKey      = GlobalKey<FormState>();
-  final _emailCtrl    = TextEditingController();
-  final _telCtrl      = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _questionCtrl = TextEditingController();
-  final _reponseCtrl  = TextEditingController();
 
-  String _role         = 'membre';
-  bool _saving         = false;
-  bool _showPassword   = false;
-  bool _showReponse    = false;
+  Personne? _selected;
+  String _phoneNumber = '';
+  String _role = 'membre';
+  bool _saving = false;
+  bool _showPassword = false;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
-    _telCtrl.dispose();
     _passwordCtrl.dispose();
-    _questionCtrl.dispose();
-    _reponseCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
+    if (_selected == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Veuillez sélectionner un membre'),
+            backgroundColor: Colors.orange),
+      );
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
+    if (_phoneNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Numéro de téléphone requis'),
+            backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
 
-    final p = widget.personne;
-    final nom    = p.nomNaissance ?? p.nomUsage ?? '';
+    final p = _selected!;
+    final nom = p.nomNaissance ?? p.nomUsage ?? '';
     final prenom = p.prenoms ?? '';
 
     final error = await ApiService.createMembre(
-      email:           _emailCtrl.text.trim(),
-      telephone:       _telCtrl.text.trim().isEmpty ? null : _telCtrl.text.trim(),
-      password:        _passwordCtrl.text,
-      nom:             nom,
-      prenom:          prenom,
-      role:            _role,
-      questionSecrete: _questionCtrl.text.trim(),
-      reponseSecrete:  _reponseCtrl.text.trim(),
-      personneId:      p.id,
+      telephone: _phoneNumber,
+      email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+      nom: nom,
+      prenom: prenom,
+      role: _role,
+      personneId: p.id,
     );
 
     if (!mounted) return;
@@ -68,10 +81,9 @@ class _CreateMembreScreenState extends State<CreateMembreScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final p     = widget.personne;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Créer un compte')),
+      appBar: AppBar(title: const Text('Nouveau compte')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -79,43 +91,13 @@ class _CreateMembreScreenState extends State<CreateMembreScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Identité (en lecture seule) ──────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-                ),
-                child: Row(children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-                    child: Text(
-                      p.nomComplet.isNotEmpty ? p.nomComplet[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(p.nomComplet,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                      if (p.datesAffichage.isNotEmpty)
-                        Text(p.datesAffichage,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
-                      Text('Le membre complètera son profil après connexion.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontStyle: FontStyle.italic)),
-                    ],
-                  )),
-                ]),
+              // ── Sélection du membre ──────────────────────────────────────
+              _label(theme, Icons.person_outline, 'Choisir le membre'),
+              const SizedBox(height: 10),
+              _MemberSelector(
+                personnes: widget.sansCompte,
+                selected: _selected,
+                onChanged: (p) => setState(() => _selected = p),
               ),
 
               const SizedBox(height: 24),
@@ -124,52 +106,52 @@ class _CreateMembreScreenState extends State<CreateMembreScreen> {
               _label(theme, Icons.shield_outlined, 'Rôle initial'),
               const SizedBox(height: 10),
               _RoleSelector(value: _role, onChanged: (v) => setState(() => _role = v)),
+
               const SizedBox(height: 24),
 
-              // ── Connexion ────────────────────────────────────────────────
+              // ── Identifiants de connexion ────────────────────────────────
               _label(theme, Icons.login_outlined, 'Identifiants de connexion'),
-              const SizedBox(height: 10),
-              _field(_emailCtrl, 'Email *',
-                keyboard: TextInputType.emailAddress,
+              const SizedBox(height: 4),
+              Text(
+                'Le membre pourra compléter son profil après sa première connexion.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontStyle: FontStyle.italic),
+              ),
+              const SizedBox(height: 12),
+
+              PhonePickerField(
+                label: 'Téléphone *',
+                required: true,
+                onChanged: (v) => _phoneNumber = v,
+              ),
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: _deco('Email (optionnel)'),
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Email requis';
+                  if (v == null || v.trim().isEmpty) return null;
                   if (!v.contains('@')) return 'Email invalide';
                   return null;
                 },
               ),
               const SizedBox(height: 12),
-              _field(_telCtrl, 'Téléphone (optionnel)', keyboard: TextInputType.phone),
-              const SizedBox(height: 12),
+
               TextFormField(
                 controller: _passwordCtrl,
                 obscureText: !_showPassword,
                 decoration: _deco('Mot de passe *').copyWith(
                   suffixIcon: IconButton(
-                    icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showPassword = !_showPassword),
+                    icon: Icon(
+                        _showPassword ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () =>
+                        setState(() => _showPassword = !_showPassword),
                   ),
                 ),
                 validator: (v) =>
                     (v == null || v.length < 8) ? 'Minimum 8 caractères' : null,
-              ),
-              const SizedBox(height: 24),
-
-              // ── Sécurité ─────────────────────────────────────────────────
-              _label(theme, Icons.lock_outline, 'Question secrète (récupération de compte)'),
-              const SizedBox(height: 10),
-              _field(_questionCtrl, 'Question secrète *', required: true),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _reponseCtrl,
-                obscureText: !_showReponse,
-                decoration: _deco('Réponse secrète *').copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(_showReponse ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showReponse = !_showReponse),
-                  ),
-                ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Réponse requise' : null,
               ),
 
               const SizedBox(height: 32),
@@ -180,10 +162,13 @@ class _CreateMembreScreenState extends State<CreateMembreScreen> {
                 child: FilledButton(
                   onPressed: _saving ? null : _save,
                   child: _saving
-                      ? const SizedBox(width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
                       : const Text('Créer le compte',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
             ],
@@ -194,29 +179,103 @@ class _CreateMembreScreenState extends State<CreateMembreScreen> {
   }
 
   Widget _label(ThemeData theme, IconData icon, String text) => Row(children: [
-    Icon(icon, size: 16, color: theme.colorScheme.primary),
-    const SizedBox(width: 6),
-    Text(text, style: theme.textTheme.titleSmall?.copyWith(
-      color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
-  ]);
+        Icon(icon, size: 16, color: theme.colorScheme.primary),
+        const SizedBox(width: 6),
+        Text(text,
+            style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w700)),
+      ]);
 
   InputDecoration _deco(String label) => InputDecoration(
-    labelText: label,
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-  );
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      );
+}
 
-  Widget _field(TextEditingController ctrl, String label, {
-    bool required = false,
-    TextInputType? keyboard,
-    String? Function(String?)? validator,
-  }) => TextFormField(
-    controller: ctrl,
-    keyboardType: keyboard,
-    decoration: _deco(label),
-    validator: validator ??
-        (required ? (v) => (v == null || v.trim().isEmpty) ? 'Champ requis' : null : null),
-  );
+// ── Sélecteur de membre ───────────────────────────────────────────────────────
+
+class _MemberSelector extends StatelessWidget {
+  final List<Personne> personnes;
+  final Personne? selected;
+  final ValueChanged<Personne?> onChanged;
+
+  const _MemberSelector({
+    required this.personnes,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (personnes.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          'Tous les membres ont déjà un compte.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+        ),
+      );
+    }
+
+    return DropdownButtonFormField<Personne>(
+      initialValue: selected,
+      isExpanded: true,
+      decoration: InputDecoration(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        hintText: 'Sélectionner un membre',
+      ),
+      items: personnes
+          .map((p) => DropdownMenuItem(
+                value: p,
+                child: Row(children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor:
+                        theme.colorScheme.primary.withValues(alpha: 0.12),
+                    child: Text(
+                      p.nomComplet.isNotEmpty
+                          ? p.nomComplet[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(p.nomComplet,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14),
+                            overflow: TextOverflow.ellipsis),
+                        if (p.datesAffichage.isNotEmpty)
+                          Text(p.datesAffichage,
+                              style: theme.textTheme.bodySmall,
+                              overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                ]),
+              ))
+          .toList(),
+      onChanged: onChanged,
+    );
+  }
 }
 
 // ── Sélecteur de rôle ────────────────────────────────────────────────────────
@@ -228,14 +287,26 @@ class _RoleSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(children: [
-    _Option(label: 'Membre', desc: 'Consulte uniquement',
-      icon: Icons.person_outline, role: 'membre', selected: value == 'membre',
-      color: Theme.of(context).colorScheme.primary, onTap: () => onChanged('membre')),
-    const SizedBox(width: 12),
-    _Option(label: 'Gestionnaire', desc: 'Peut modifier',
-      icon: Icons.manage_accounts_outlined, role: 'gestionnaire', selected: value == 'gestionnaire',
-      color: Colors.orange.shade700, onTap: () => onChanged('gestionnaire')),
-  ]);
+        _Option(
+          label: 'Membre',
+          desc: 'Consulte uniquement',
+          icon: Icons.person_outline,
+          role: 'membre',
+          selected: value == 'membre',
+          color: Theme.of(context).colorScheme.primary,
+          onTap: () => onChanged('membre'),
+        ),
+        const SizedBox(width: 12),
+        _Option(
+          label: 'Gestionnaire',
+          desc: 'Peut modifier',
+          icon: Icons.manage_accounts_outlined,
+          role: 'gestionnaire',
+          selected: value == 'gestionnaire',
+          color: Colors.orange.shade700,
+          onTap: () => onChanged('gestionnaire'),
+        ),
+      ]);
 }
 
 class _Option extends StatelessWidget {
@@ -244,35 +315,64 @@ class _Option extends StatelessWidget {
   final bool selected;
   final Color color;
   final VoidCallback onTap;
-  const _Option({required this.label, required this.desc, required this.icon,
-    required this.role, required this.selected, required this.color, required this.onTap});
+  const _Option({
+    required this.label,
+    required this.desc,
+    required this.icon,
+    required this.role,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.08) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? color : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-            width: selected ? 2 : 1),
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: selected ? color.withValues(alpha: 0.08) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected
+                    ? color
+                    : Theme.of(context)
+                        .colorScheme
+                        .outline
+                        .withValues(alpha: 0.3),
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon,
+                    size: 20,
+                    color: selected
+                        ? color
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.4)),
+                const SizedBox(height: 8),
+                Text(label,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: selected
+                            ? color
+                            : Theme.of(context).colorScheme.onSurface)),
+                const SizedBox(height: 2),
+                Text(desc,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6))),
+              ],
+            ),
+          ),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(icon, size: 20,
-            color: selected ? color : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
-          const SizedBox(height: 8),
-          Text(label, style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: selected ? color : Theme.of(context).colorScheme.onSurface)),
-          const SizedBox(height: 2),
-          Text(desc, style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-        ]),
-      ),
-    ),
-  );
+      );
 }

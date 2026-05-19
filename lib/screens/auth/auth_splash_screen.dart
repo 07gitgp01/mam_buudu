@@ -61,7 +61,16 @@ class _AuthSplashScreenState extends State<AuthSplashScreen>
       return;
     }
 
-    // 2. Session valide : biométrie activée sur cet appareil ?
+    // 2. Profil non complété → demander la question secrète
+    final profileComplete = await ApiService.hasCompletedProfile();
+    if (!profileComplete) {
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/complete_profile', (_) => false);
+      }
+      return;
+    }
+
+    // 3. Session valide : biométrie activée sur cet appareil ?
     final biometricEnabled = await BiometricService.isEnabled();
 
     if (!biometricEnabled) {

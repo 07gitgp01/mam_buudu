@@ -15,9 +15,7 @@ class MembresAdminScreen extends StatefulWidget {
 class _MembresAdminScreenState extends State<MembresAdminScreen> {
   final _repo = PersonneRepository();
 
-  /// Membres avec compte login (depuis API)
   List<Map<String, dynamic>> _membres = [];
-  /// Toutes les personnes de l'arbre (depuis SQLite)
   List<Personne> _personnes = [];
 
   bool _isLoading = true;
@@ -63,7 +61,6 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
 
   bool get _canManage => _myRole == 'admin' || _myRole == 'gestionnaire';
 
-  /// personneIds déjà liés à un compte
   Set<String> get _personnesWithAccount {
     final ids = <String>{};
     for (final m in _membres) {
@@ -99,8 +96,12 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
               : 'Il/Elle ne pourra plus modifier les données.'}',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Passer en $newLabel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Passer en $newLabel')),
         ],
       ),
     );
@@ -110,14 +111,31 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
     final err = await ApiService.changeMemberRole(userId: userId, role: newRole);
     if (!mounted) return;
     if (err != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(err), backgroundColor: Colors.red));
       setState(() => _isLoading = false);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$nom est maintenant $newLabel'), backgroundColor: Colors.green),
+        SnackBar(
+            content: Text('$nom est maintenant $newLabel'),
+            backgroundColor: Colors.green),
       );
       _load();
     }
+  }
+
+  // ── FAB : ouvrir CreateMembreScreen ─────────────────────────────────────────
+
+  Future<void> _openCreateCompte() async {
+    final withAccount = _personnesWithAccount;
+    final sansCompte =
+        _personnes.where((p) => !withAccount.contains(p.id)).toList();
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => CreateMembreScreen(sansCompte: sansCompte)),
+    );
+    if (created == true) _load();
   }
 
   // ── Build ────────────────────────────────────────────────────────────────────
@@ -135,33 +153,48 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
           : _error != null
               ? _buildError(theme)
               : _buildBody(theme),
+      floatingActionButton: _canManage
+          ? FloatingActionButton.extended(
+              onPressed: _openCreateCompte,
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Nouveau compte'),
+            )
+          : null,
     );
   }
 
   Widget _buildBody(ThemeData theme) {
-    final withAccount    = _personnesWithAccount;
-    final avecCompte     = _membres; // membres avec compte (certains liés à une personne)
-    final sansCompte     = _personnes.where((p) => !withAccount.contains(p.id)).toList();
+    final withAccount = _personnesWithAccount;
+
+    // Membres avec compte, en excluant l'utilisateur connecté
+    final avecCompte = _membres
+        .where((m) {
+          final u = m['user'] as Map?;
+          return u != null && u['id'] != _myUserId;
+        })
+        .toList();
+
+    final sansCompte =
+        _personnes.where((p) => !withAccount.contains(p.id)).toList();
 
     final items = <Widget>[];
 
-    // ── Section : comptes login ──────────────────────────────────────────────
     if (avecCompte.isNotEmpty) {
-      items.add(_sectionHeader(theme, Icons.verified_user_outlined, 'Comptes actifs', avecCompte.length));
+      items.add(_sectionHeader(
+          theme, Icons.verified_user_outlined, 'Comptes actifs', avecCompte.length));
       for (final m in avecCompte) {
-        // Trouver la Personne liée si disponible
-        final pid      = m['personneId'] as String?;
-        final personne = pid != null
-            ? _personnes.where((p) => p.id == pid).firstOrNull
-            : null;
+        final pid = m['personneId'] as String?;
+        final personne =
+            pid != null ? _personnes.where((p) => p.id == pid).firstOrNull : null;
         items.add(_buildMembreTile(theme, m, personne));
       }
     }
 
-    // ── Section : membres sans compte ────────────────────────────────────────
     if (sansCompte.isNotEmpty) {
-      items.add(_sectionHeader(theme, Icons.person_outline, 'Sans compte', sansCompte.length,
-          subtitle: 'Créez un compte pour leur donner accès à l\'app'));
+      items.add(_sectionHeader(
+        theme, Icons.person_outline, 'Sans compte', sansCompte.length,
+        subtitle: 'Utilisez le bouton + pour créer un accès',
+      ));
       for (final p in sansCompte) {
         items.add(_buildSansCompteTile(theme, p));
       }
@@ -174,7 +207,8 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
           children: [
             Icon(Icons.group_off, size: 64, color: theme.colorScheme.outline),
             const SizedBox(height: 16),
-            Text('Aucun membre dans l\'arbre', style: theme.textTheme.titleMedium),
+            Text("Aucun membre dans l'arbre",
+                style: theme.textTheme.titleMedium),
           ],
         ),
       );
@@ -186,7 +220,8 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
     );
   }
 
-  Widget _sectionHeader(ThemeData theme, IconData icon, String title, int count, {String? subtitle}) {
+  Widget _sectionHeader(ThemeData theme, IconData icon, String title, int count,
+      {String? subtitle}) {
     return Padding(
       padding: const EdgeInsets.only(top: 16, bottom: 8),
       child: Row(
@@ -194,21 +229,27 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
           Icon(icon, size: 16, color: theme.colorScheme.primary),
           const SizedBox(width: 6),
           Text('$title ($count)',
-            style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
+              style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700)),
           if (subtitle != null) ...[
             const SizedBox(width: 6),
-            Expanded(child: Text(subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-              overflow: TextOverflow.ellipsis)),
+            Expanded(
+              child: Text(subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                  overflow: TextOverflow.ellipsis),
+            ),
           ],
         ],
       ),
     );
   }
 
-  // ── Tuile membre avec compte ─────────────────────────────────────────────────
+  // ── Tuile membre avec compte ──────────────────────────────────────────────────
 
-  Widget _buildMembreTile(ThemeData theme, Map<String, dynamic> membre, Personne? personne) {
+  Widget _buildMembreTile(
+      ThemeData theme, Map<String, dynamic> membre, Personne? personne) {
     final rawUser = membre['user'];
     if (rawUser == null) return const SizedBox.shrink();
     final user   = Map<String, dynamic>.from(rawUser as Map);
@@ -218,9 +259,7 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
         ? personne!.nomComplet
         : '${user['prenom'] ?? ''} ${user['nom'] ?? ''}'.trim();
     final email  = user['email'] as String? ?? '';
-    final isMe   = userId == _myUserId;
     final isAdmin = role == 'admin';
-
     final initials = nom.isNotEmpty ? nom[0].toUpperCase() : '?';
 
     return Card(
@@ -229,50 +268,61 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
           child: Text(initials,
-            style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary)),
         ),
-        title: Row(children: [
-          Expanded(child: Text(nom, style: const TextStyle(fontWeight: FontWeight.w600))),
-          if (isMe) _Chip(label: 'Moi',
-            bg: theme.colorScheme.secondary.withValues(alpha: 0.15), fg: theme.colorScheme.secondary),
-        ]),
-        subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (email.isNotEmpty) Text(email, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 4),
-          _RoleBadge(role: role),
-        ]),
-        trailing: (_canManage && !isAdmin && !isMe)
-            ? _roleButton(membre, role)
+        title: Text(nom,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (email.isNotEmpty)
+              Text(email, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 4),
+            _RoleBadge(role: role),
+          ],
+        ),
+        trailing: (_canManage && !isAdmin)
+            ? _roleButton(membre, role, userId)
             : null,
       ),
     );
   }
 
-  Widget _roleButton(Map<String, dynamic> membre, String role) {
+  Widget _roleButton(
+      Map<String, dynamic> membre, String role, String userId) {
     final isGest = role == 'gestionnaire';
     return TextButton.icon(
       style: TextButton.styleFrom(
-        foregroundColor: isGest ? Colors.orange.shade700 : Colors.green.shade700,
+        foregroundColor:
+            isGest ? Colors.orange.shade700 : Colors.green.shade700,
         padding: const EdgeInsets.symmetric(horizontal: 8),
       ),
       onPressed: () => _changeRole(membre),
-      icon: Icon(isGest ? Icons.arrow_downward : Icons.arrow_upward, size: 16),
+      icon: Icon(
+          isGest ? Icons.arrow_downward : Icons.arrow_upward, size: 16),
       label: Text(isGest ? 'Membre' : 'Gestionnaire',
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          style:
+              const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
     );
   }
 
-  // ── Tuile membre SANS compte ─────────────────────────────────────────────────
+  // ── Tuile membre SANS compte ──────────────────────────────────────────────────
 
   Widget _buildSansCompteTile(ThemeData theme, Personne p) {
-    final initials = p.nomComplet.isNotEmpty ? p.nomComplet[0].toUpperCase() : '?';
-    final sexeColor = p.sexe == 'M' ? Colors.blue.shade300
-        : p.sexe == 'F' ? Colors.pink.shade300
-        : theme.colorScheme.outline;
+    final initials =
+        p.nomComplet.isNotEmpty ? p.nomComplet[0].toUpperCase() : '?';
+    final sexeColor = p.sexe == 'M'
+        ? Colors.blue.shade300
+        : p.sexe == 'F'
+            ? Colors.pink.shade300
+            : theme.colorScheme.outline;
 
     return Card(
       elevation: 0,
@@ -280,57 +330,55 @@ class _MembresAdminScreenState extends State<MembresAdminScreen> {
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+        side: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
           backgroundColor: sexeColor.withValues(alpha: 0.2),
-          child: Text(initials, style: TextStyle(fontWeight: FontWeight.bold, color: sexeColor)),
+          child: Text(initials,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: sexeColor)),
         ),
-        title: Text(p.nomComplet, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (p.datesAffichage.isNotEmpty) Text(p.datesAffichage, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 4),
-          _RoleBadge(role: 'membre', muted: true),
-        ]),
-        trailing: _canManage
-            ? FilledButton.tonal(
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  minimumSize: const Size(0, 32),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-                onPressed: () => _openCreateCompte(p),
-                child: const Text('Créer compte'),
-              )
-            : Icon(Icons.lock_outline, size: 18, color: theme.colorScheme.outline),
+        title: Text(p.nomComplet,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (p.datesAffichage.isNotEmpty)
+              Text(p.datesAffichage, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 4),
+            _RoleBadge(role: 'membre', muted: true),
+          ],
+        ),
+        trailing: Icon(Icons.lock_outline,
+            size: 18, color: theme.colorScheme.outline),
       ),
     );
   }
 
-  Future<void> _openCreateCompte(Personne p) async {
-    final created = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => CreateMembreScreen(personne: p)),
-    );
-    if (created == true) _load();
-  }
-
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // ── Erreur ────────────────────────────────────────────────────────────────────
 
   Widget _buildError(ThemeData theme) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.cloud_off, size: 64, color: theme.colorScheme.error),
-        const SizedBox(height: 16),
-        Text(_error!, textAlign: TextAlign.center),
-        const SizedBox(height: 16),
-        FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Réessayer')),
-      ]),
-    ),
-  );
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.cloud_off, size: 64, color: theme.colorScheme.error),
+              const SizedBox(height: 16),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Réessayer')),
+            ],
+          ),
+        ),
+      );
 }
 
 // ── Widgets ───────────────────────────────────────────────────────────────────
@@ -346,9 +394,13 @@ class _RoleBadge extends StatelessWidget {
     final String label;
     switch (role) {
       case 'admin':
-        bg = Colors.red.shade50; fg = Colors.red.shade700; label = 'Administrateur';
+        bg = Colors.red.shade50;
+        fg = Colors.red.shade700;
+        label = 'Administrateur';
       case 'gestionnaire':
-        bg = Colors.orange.shade50; fg = Colors.orange.shade800; label = 'Gestionnaire';
+        bg = Colors.orange.shade50;
+        fg = Colors.orange.shade800;
+        label = 'Gestionnaire';
       default:
         bg = muted
             ? Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)
@@ -360,22 +412,11 @@ class _RoleBadge extends StatelessWidget {
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
     );
   }
-}
-
-class _Chip extends StatelessWidget {
-  final String label;
-  final Color bg, fg;
-  const _Chip({required this.label, required this.bg, required this.fg});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(left: 6),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-    child: Text(label, style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
-  );
 }

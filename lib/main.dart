@@ -13,6 +13,7 @@ import 'screens/livret_screen.dart';
 import 'screens/auth/auth_splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
+import 'screens/auth/complete_profile_screen.dart';
 // import 'screens/notifications_screen.dart';
 import 'services/notification_service.dart';
 import 'theme/family_connect_theme.dart';
@@ -68,6 +69,7 @@ class MyApp extends StatelessWidget {
         '/landing': (context) => const LandingScreen(),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
+        '/complete_profile': (context) => const CompleteProfileScreen(),
         '/wizard': (context) => const WizardScreen(),
         '/home': (context) => const FamilyNavigation(),
         '/tree': (context) {
