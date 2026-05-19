@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../services/auth_local_service.dart';
-import '../home_screen.dart';
+import '../../services/api_service.dart';
+import '../../services/biometric_service.dart';
 import '../landing_screen.dart';
-import 'login_screen.dart';
 
 class AuthSplashScreen extends StatefulWidget {
   const AuthSplashScreen({super.key});
@@ -14,75 +13,93 @@ class AuthSplashScreen extends StatefulWidget {
 
 class _AuthSplashScreenState extends State<AuthSplashScreen>
     with TickerProviderStateMixin {
-  final AuthLocalService _authService = AuthLocalService();
   late AnimationController _logoController;
   late AnimationController _textController;
   late Animation<double> _logoScale;
   late Animation<double> _textOpacity;
 
+  String _statusText = 'Vérification de votre session...';
+
   @override
   void initState() {
     super.initState();
-    
-    // Animations
+
     _logoController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    
     _textController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
+    _logoScale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
+    );
+    _textOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _textController, curve: Curves.easeIn),
+    );
 
-    _logoScale = Tween<double>(
-      begin: 0.5,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _logoController,
-      curve: Curves.elasticOut,
-    ));
-
-    _textOpacity = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _textController,
-      curve: Curves.easeIn,
-    ));
-
-    // Démarrer les animations
     _logoController.forward();
-    
-    // Vérifier la session après les animations
-    _checkSessionAndNavigate();
-  }
-
-  Future<void> _checkSessionAndNavigate() async {
-    // Démarrer l'animation du texte après un délai
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        _textController.forward();
-      }
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _textController.forward();
     });
 
-    // Vérifier la session
-    await Future.delayed(const Duration(milliseconds: 2000));
-    
-    if (mounted) {
-      final hasSession = await _authService.checkSession();
-      
-      if (hasSession) {
-        // Utilisateur déjà connecté
-        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
-      } else {
-        // Utilisateur non connecté
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LandingScreen()),
-          (route) => false,
-        );
-      }
+    _checkAndNavigate();
+  }
+
+  Future<void> _checkAndNavigate() async {
+    // Attendre la fin des animations
+    await Future.delayed(const Duration(milliseconds: 1800));
+    if (!mounted) return;
+
+    // 1. Session encore valide ?
+    final sessionValid = await ApiService.isSessionValid();
+
+    if (!sessionValid) {
+      // Token absent ou expiré → login obligatoire
+      _goToLanding();
+      return;
     }
+
+    // 2. Session valide : biométrie activée sur cet appareil ?
+    final biometricEnabled = await BiometricService.isEnabled();
+
+    if (!biometricEnabled) {
+      // Pas de biométrie configurée → accès direct
+      _goHome();
+      return;
+    }
+
+    // 3. Biométrie activée → demander l'empreinte
+    if (mounted) {
+      setState(() => _statusText = 'Posez votre doigt pour déverrouiller');
+    }
+
+    final authenticated = await BiometricService.authenticate(
+      reason: 'Déverrouillez Mam Buudu avec votre empreinte digitale',
+    );
+
+    if (!mounted) return;
+
+    if (authenticated) {
+      _goHome();
+    } else {
+      // Échec biométrie → on propose le login classique
+      setState(() => _statusText = 'Authentification échouée');
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (mounted) _goToLanding();
+    }
+  }
+
+  void _goHome() {
+    Navigator.of(context).pushNamedAndRemoveUntil('/home', (_) => false);
+  }
+
+  void _goToLanding() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LandingScreen()),
+      (_) => false,
+    );
   }
 
   @override
@@ -113,15 +130,10 @@ class _AuthSplashScreenState extends State<AuthSplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo animé
                 AnimatedBuilder(
                   animation: _logoScale,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _logoScale.value,
-                      child: child,
-                    );
-                  },
+                  builder: (_, child) =>
+                      Transform.scale(scale: _logoScale.value, child: child),
                   child: Container(
                     width: 120,
                     height: 120,
@@ -130,7 +142,7 @@ class _AuthSplashScreenState extends State<AuthSplashScreen>
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.blue.withOpacity(0.3),
+                          color: Colors.blue.withValues(alpha: 0.3),
                           blurRadius: 20,
                           spreadRadius: 10,
                         ),
@@ -143,18 +155,13 @@ class _AuthSplashScreenState extends State<AuthSplashScreen>
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 40),
-                
-                // Texte animé
+
                 AnimatedBuilder(
                   animation: _textOpacity,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _textOpacity.value,
-                      child: child,
-                    );
-                  },
+                  builder: (_, child) =>
+                      Opacity(opacity: _textOpacity.value, child: child),
                   child: Column(
                     children: [
                       Text(
@@ -177,18 +184,13 @@ class _AuthSplashScreenState extends State<AuthSplashScreen>
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 60),
-                
-                // Indicateur de chargement
+
                 AnimatedBuilder(
                   animation: _textOpacity,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _textOpacity.value,
-                      child: child,
-                    );
-                  },
+                  builder: (_, child) =>
+                      Opacity(opacity: _textOpacity.value, child: child),
                   child: Column(
                     children: [
                       SizedBox(
@@ -201,11 +203,12 @@ class _AuthSplashScreenState extends State<AuthSplashScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Vérification de votre session...',
+                        _statusText,
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           color: Colors.grey.shade600,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),

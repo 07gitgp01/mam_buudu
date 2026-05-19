@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/family_connect_theme.dart';
+import '../database/personne_repository.dart';
+import '../database/union_repository.dart';
+import '../models/personne.dart';
+import '../screens/person_detail_screen.dart';
 
 /// Écran de profil familial moderne avec statistiques
 class FamilyProfileScreen extends StatefulWidget {
@@ -12,35 +17,37 @@ class FamilyProfileScreen extends StatefulWidget {
 
 class _FamilyProfileScreenState extends State<FamilyProfileScreen>
     with TickerProviderStateMixin {
-  
+
+  final PersonneRepository _personneRepo = PersonneRepository();
+  final UnionRepository _unionRepo = UnionRepository();
+
   late AnimationController _statsController;
   late AnimationController _fadeController;
   late Animation<double> _statsAnimation;
   late Animation<double> _fadeAnimation;
-  
-  // Statistiques familiales
-  final Map<String, int> _familyStats = {
-    'Total personnes': 156,
-    'Générations': 5,
-    'Unions': 42,
-    'Photos': 89,
-    'Documents': 23,
-  };
-  
+
+  int _totalPersonnes = 0;
+  int _totalUnions = 0;
+  int _totalPhotos = 0;
+  List<Personne> _recentPersonnes = [];
+  bool _statsLoaded = false;
+  String _familleName = '';
+  String _familleCode = '';
+
   @override
   void initState() {
     super.initState();
-    
+
     _statsController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _fadeController = AnimationController(
       duration: FamilyConnectTheme.normalDuration,
       vsync: this,
     );
-    
+
     _statsAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -48,7 +55,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
       parent: _statsController,
       curve: FamilyConnectTheme.sharpCurve,
     ));
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -56,14 +63,46 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
       parent: _fadeController,
       curve: FamilyConnectTheme.defaultCurve,
     ));
-    
-    // Démarrer les animations
+
     _fadeController.forward();
-    Future.delayed(const Duration(milliseconds: 300), () {
+    _loadStats();
+    _loadFamilleInfo();
+  }
+
+  Future<void> _loadFamilleInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _familleName = prefs.getString('api_famille_nom') ?? '';
+        _familleCode = prefs.getString('api_famille_code') ?? '';
+      });
+    }
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final results = await Future.wait([
+        _personneRepo.getCount(),
+        _unionRepo.getCount(),
+        _personneRepo.getWithPhoto(),
+        _personneRepo.getRecentlyAdded(limit: 3),
+      ]);
       if (mounted) {
+        setState(() {
+          _totalPersonnes = results[0] as int;
+          _totalUnions = results[1] as int;
+          _totalPhotos = (results[2] as List<Personne>).length;
+          _recentPersonnes = results[3] as List<Personne>;
+          _statsLoaded = true;
+        });
         _statsController.forward();
       }
-    });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _statsLoaded = true);
+        _statsController.forward();
+      }
+    }
   }
   
   @override
@@ -133,7 +172,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Famille Dupont',
+                        _familleName.isNotEmpty ? 'Famille $_familleName' : 'Ma famille',
                         style: FamilyConnectTheme.h3.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -141,7 +180,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Arbre généalogique complet',
+                        _familleCode.isNotEmpty ? 'Code : $_familleCode' : 'Arbre généalogique',
                         style: FamilyConnectTheme.bodyMedium.copyWith(
                           color: Colors.white.withValues(alpha: 0.8),
                         ),
@@ -173,7 +212,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceVariant,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: FamilyConnectTheme.radiusLg,
         ),
         child: Column(
@@ -192,16 +231,16 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
                   child: _buildOverviewItem(
                     icon: Icons.person,
                     label: 'Membres',
-                    value: '${_familyStats['Total personnes']}',
+                    value: '$_totalPersonnes',
                     color: FamilyConnectTheme.primaryGradient,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildOverviewItem(
-                    icon: Icons.layers,
-                    label: 'Générations',
-                    value: '${_familyStats['Générations']}',
+                    icon: Icons.photo_library,
+                    label: 'Photos',
+                    value: '$_totalPhotos',
                     color: FamilyConnectTheme.secondaryGradient,
                   ),
                 ),
@@ -210,7 +249,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
                   child: _buildOverviewItem(
                     icon: Icons.favorite,
                     label: 'Unions',
-                    value: '${_familyStats['Unions']}',
+                    value: '$_totalUnions',
                     color: FamilyConnectTheme.accentGradient,
                   ),
                 ),
@@ -270,6 +309,12 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
   }
   
   Widget _buildStatsGrid() {
+    final stats = [
+      ('Personnes', _totalPersonnes, Icons.people),
+      ('Unions', _totalUnions, Icons.favorite),
+      ('Photos', _totalPhotos, Icons.photo_library),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -280,17 +325,18 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
           ),
         ),
         const SizedBox(height: 16),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.4,
-          children: _familyStats.entries.map((entry) {
-            return _buildStatCard(entry.key, entry.value);
-          }).toList(),
-        ),
+        if (!_statsLoaded)
+          const Center(child: CircularProgressIndicator())
+        else
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.4,
+            children: stats.map((s) => _buildStatCard(s.$1, s.$2)).toList(),
+          ),
       ],
     );
   }
@@ -306,7 +352,7 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: FamilyConnectTheme.radiusLg,
                 boxShadow: FamilyConnectTheme.shadowSm,
               ),
@@ -337,90 +383,55 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
   }
   
   Widget _buildRecentActivity() {
+    if (_recentPersonnes.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Activité récente',
-              style: FamilyConnectTheme.h4.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                // Voir toute l'activité
-              },
-              child: Text(
-                'Voir tout',
-                style: FamilyConnectTheme.bodySmall.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-            ),
-          ],
+        Text(
+          'Ajouts récents',
+          style: FamilyConnectTheme.h4.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
         const SizedBox(height: 16),
-        ...[
-          _buildActivityItem(
-            icon: Icons.person_add,
-            title: 'Nouvelle personne ajoutée',
-            subtitle: 'Marie Durand - Il y a 2 heures',
-            color: FamilyConnectTheme.successColor,
-          ),
-          _buildActivityItem(
-            icon: Icons.photo,
-            title: 'Photo ajoutée',
-            subtitle: 'Jean Martin - Il y a 5 heures',
-            color: FamilyConnectTheme.primaryColor,
-          ),
-          _buildActivityItem(
-            icon: Icons.edit,
-            title: 'Profil mis à jour',
-            subtitle: 'Sophie Bernard - Hier',
-            color: FamilyConnectTheme.warningColor,
-          ),
-        ],
+        ..._recentPersonnes.map((p) => _buildPersonActivityItem(p)),
       ],
     );
   }
-  
-  Widget _buildActivityItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-  }) {
+
+  Widget _buildPersonActivityItem(Personne personne) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
-          // Voir les détails
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PersonDetailScreen(personneId: personne.id),
+            ),
+          );
         },
         borderRadius: FamilyConnectTheme.radiusSm,
         child: Container(
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: FamilyConnectTheme.radiusSm,
           ),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: FamilyConnectTheme.radiusSm,
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 20,
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: FamilyConnectTheme.primaryColor.withValues(alpha: 0.15),
+                child: Text(
+                  personne.nomComplet.isNotEmpty ? personne.nomComplet[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    color: FamilyConnectTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -429,19 +440,19 @@ class _FamilyProfileScreenState extends State<FamilyProfileScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      personne.nomComplet,
                       style: FamilyConnectTheme.bodyMedium.copyWith(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: FamilyConnectTheme.bodySmall.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    if (personne.dateNaissance != null)
+                      Text(
+                        'Né(e) ${personne.dateNaissance!.toString()}',
+                        style: FamilyConnectTheme.bodySmall.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

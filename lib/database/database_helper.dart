@@ -310,6 +310,18 @@ class DatabaseHelper {
     );
   }
 
+  /// Efface toutes les données généalogiques locales (personnes, unions, filiations).
+  /// À appeler lors d'un changement de famille connectée pour éviter les fuites de données.
+  Future<void> clearFamilyData() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('filiations');
+      await txn.delete('union_participants');
+      await txn.delete('unions');
+      await txn.delete('personnes');
+    });
+  }
+
   // Fermeture de la base de données
   Future<void> close() async {
     final db = _database;

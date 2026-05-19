@@ -8,6 +8,8 @@ import '../database/filiation_repository.dart';
 import 'person_form_screen.dart';
 import 'union_form_screen.dart';
 import 'ajout_enfant_screen.dart';
+import '../services/sync_service.dart';
+import '../services/api_service.dart';
 
 class PersonDetailScreen extends StatefulWidget {
   final String personneId;
@@ -27,12 +29,14 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   List<Union> _unions = [];
   List<Personne> _enfants = [];
   bool _isLoading = true;
+  bool _canEdit = false;
 
   @override
   void initState() {
     super.initState();
     print('🚀 PersonDetailScreen initState pour ${widget.personneId}');
     _loadPersonne();
+    ApiService.userCanEdit().then((v) { if (mounted) setState(() => _canEdit = v); });
   }
 
   @override
@@ -157,16 +161,18 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       appBar: AppBar(
         title: Text(_personne!.nomComplet),
         actions: [
-          IconButton(
-            onPressed: _editPersonne,
-            icon: const Icon(Icons.edit),
-            tooltip: 'Modifier',
-          ),
-          IconButton(
-            onPressed: _deletePersonne,
-            icon: const Icon(Icons.delete),
-            tooltip: 'Supprimer',
-          ),
+          if (_canEdit) ...[
+            IconButton(
+              onPressed: _editPersonne,
+              icon: const Icon(Icons.edit),
+              tooltip: 'Modifier',
+            ),
+            IconButton(
+              onPressed: _deletePersonne,
+              icon: const Icon(Icons.delete),
+              tooltip: 'Supprimer',
+            ),
+          ],
         ],
       ),
       body: SingleChildScrollView(
@@ -709,8 +715,10 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     );
 
     if (confirmed == true) {
+      final id = _personne!.id;
       try {
-        await _personneRepo.delete(_personne!.id);
+        await _personneRepo.delete(id);
+        SyncService().deletePersonne(id).ignore();
         if (mounted) {
           Navigator.pop(context, true);
         }

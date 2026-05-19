@@ -13,6 +13,8 @@ import 'landing_screen.dart';
 import '../widgets/enhanced_search_bar.dart';
 import '../widgets/instagram_person_card.dart';
 import '../navigation/family_navigation.dart';
+import '../services/sync_service.dart';
+import '../services/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -178,6 +180,59 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _syncMigrate() async {
+    final token = await ApiService.getToken();
+    if (!mounted) return;
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connexion serveur requise pour synchroniser'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        title: Text('Sync en cours...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Envoi vers le serveur...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final result = await SyncService().migrateLocalData();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.summary),
+          backgroundColor: result.isSuccess ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur sync : $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _logout() async {
     try {
       await _authService.logout();
@@ -274,6 +329,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _importerGedcom();
               } else if (value == 'export_gedcom') {
                 _exporterGedcom();
+              } else if (value == 'sync') {
+                _syncMigrate();
               } else if (value == 'logout') {
                 _showLogoutDialog();
               }
@@ -300,12 +357,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const PopupMenuItem(
+                value: 'sync',
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_upload_outlined, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('Migrer vers le cloud'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'logout',
                 child: Row(
                   children: [
                     Icon(Icons.logout, color: Colors.red),
                     SizedBox(width: 8),
-                    Text('Se déconnecter', style: TextStyle(color: Colors.red)),
+                    Text('Se deconnecter', style: TextStyle(color: Colors.red)),
                   ],
                 ),
               ),

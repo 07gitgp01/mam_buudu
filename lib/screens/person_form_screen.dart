@@ -7,6 +7,8 @@ import '../database/personne_repository.dart';
 import '../widgets/date_partielle_picker.dart';
 import '../widgets/photo_picker.dart';
 import '../services/notification_service.dart';
+import '../services/sync_service.dart';
+import '../services/api_service.dart';
 // import '../services/notification_local_service.dart';
 
 class PersonFormScreen extends StatefulWidget {
@@ -287,8 +289,18 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
   }
 
   Future<void> _savePersonne() async {
-    if (!_formKey.currentState!.validate()) {
-      // Le formulaire est invalide, les messages d'erreur s'affichent automatiquement
+    if (!_formKey.currentState!.validate()) return;
+
+    final canEdit = await ApiService.userCanEdit();
+    if (!canEdit) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Accès refusé : seuls les gestionnaires et administrateurs peuvent modifier les données.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
@@ -332,30 +344,12 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
 
       if (widget.personne == null) {
         await _personneRepo.insert(personne);
+        SyncService().pushPersonne(personne, operation: 'create').ignore();
         _showSuccessSnackBar('Personne créée avec succès !');
-        
-        // Planifier les notifications d'anniversaire si une date de naissance est définie
-        // if (personne.dateNaissance != null) {
-        //   try {
-        //     await _notificationService.scheduleBirthdayNotifications();
-        //     print('Notifications d\'anniversaire planifiées pour ${personne.nomComplet}');
-        //   } catch (e) {
-        //     print('Erreur lors de la planification des notifications: $e');
-        //   }
-        // }
       } else {
         await _personneRepo.update(personne);
+        SyncService().pushPersonne(personne, operation: 'update').ignore();
         _showSuccessSnackBar('Personne mise à jour avec succès !');
-        
-        // Mettre à jour les notifications d'anniversaire si la date de naissance a changé
-        // if (personne.dateNaissance != null) {
-        //   try {
-        //     await _notificationService.scheduleBirthdayNotifications();
-        //     print('Notifications d\'anniversaire mises à jour pour ${personne.nomComplet}');
-        //   } catch (e) {
-        //     print('Erreur lors de la mise à jour des notifications: $e');
-        //   }
-        // }
       }
 
       if (mounted) {
@@ -431,6 +425,7 @@ class _PersonFormScreenState extends State<PersonFormScreen> {
     if (confirmed == true && widget.personne != null) {
       try {
         await _personneRepo.delete(widget.personne!.id);
+        SyncService().deletePersonne(widget.personne!.id).ignore();
         NotificationService.showSuccess('Personne supprimée avec succès !');
         if (mounted) {
           Navigator.pop(context, true);

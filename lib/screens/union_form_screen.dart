@@ -8,6 +8,8 @@ import '../database/personne_repository.dart';
 import '../widgets/date_partielle_picker.dart';
 import '../widgets/multi_select_chip.dart';
 import '../services/notification_service.dart';
+import '../services/sync_service.dart';
+import '../services/api_service.dart';
 
 class UnionFormScreen extends StatefulWidget {
   final String? personneIdInitiale;
@@ -283,6 +285,19 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
   }
 
   Future<void> _saveUnion() async {
+    final canEdit = await ApiService.userCanEdit();
+    if (!canEdit) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Accès refusé : seuls les gestionnaires et administrateurs peuvent modifier les données.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     print('=== DÉBUT SAVE UNION ===');
     print('Mode modification: ${widget.union != null}');
     print('Type: $_type');
@@ -351,6 +366,20 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
           );
         }
         print('✅ Tous les participants ajoutés');
+        SyncService().pushUnion(
+          Union(
+            id: unionId,
+            type: union.type,
+            dateDebut: union.dateDebut,
+            lieuDebut: union.lieuDebut,
+            dateFin: union.dateFin,
+            lieuFin: union.lieuFin,
+            notes: union.notes,
+            parentIds: _participants.map((p) => p.id).toList(),
+            enfantIds: const [],
+          ),
+          operation: 'create',
+        ).ignore();
         NotificationService.showSuccess('Union créée avec succès !');
       } else {
         // Modification
@@ -373,6 +402,20 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
           );
         }
         print('✅ Participants recréés');
+        SyncService().pushUnion(
+          Union(
+            id: union.id,
+            type: union.type,
+            dateDebut: union.dateDebut,
+            lieuDebut: union.lieuDebut,
+            dateFin: union.dateFin,
+            lieuFin: union.lieuFin,
+            notes: union.notes,
+            parentIds: _participants.map((p) => p.id).toList(),
+            enfantIds: const [],
+          ),
+          operation: 'update',
+        ).ignore();
         NotificationService.showSuccess('Union mise à jour avec succès !');
       }
 
@@ -428,6 +471,7 @@ class _UnionFormScreenState extends State<UnionFormScreen> {
     if (confirmed == true && widget.union != null) {
       try {
         await _unionRepo.delete(widget.union!.id);
+        SyncService().deleteUnion(widget.union!.id).ignore();
         if (mounted) {
           Navigator.pop(context, true);
         }

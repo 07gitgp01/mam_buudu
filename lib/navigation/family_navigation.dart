@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/family_connect_theme.dart';
 import '../screens/tree_screen.dart';
 import '../screens/person_form_screen.dart';
@@ -11,6 +12,10 @@ import '../stories/family_stories_screen.dart';
 import '../screens/timeline_screen.dart';
 import '../screens/family_games_screen.dart';
 import '../services/auth_local_service.dart';
+import '../services/sync_service.dart';
+import '../services/api_service.dart';
+import '../screens/admin/membres_admin_screen.dart';
+import '../screens/wizard_screen.dart';
 
 /// Élément de navigation pour la barre inférieure
 class NavigationItem {
@@ -47,6 +52,13 @@ class _FamilyNavigationState extends State<FamilyNavigation>
   bool _isAnimating = false;
 
   final AuthLocalService _authService = AuthLocalService();
+
+  String _userName = '';
+  String _userInitials = '?';
+  String _userEmail = '';
+  String _userRole = '';
+  String _familleName = '';
+  String _familleCode = '';
   
   // Badges de notification
   final Map<int, bool> _badgeStates = {
@@ -78,6 +90,56 @@ class _FamilyNavigationState extends State<FamilyNavigation>
     
     // Animation d'entrée initiale
     _animationController.forward();
+
+    _loadUserInfo();
+    _pullOnStartup();
+  }
+
+  Future<void> _loadUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final prenom = prefs.getString('api_user_prenom') ?? '';
+    final nom = prefs.getString('api_user_nom') ?? '';
+    final fullName = '$prenom $nom'.trim();
+    final initials = [
+      prenom.isNotEmpty ? prenom[0] : '',
+      nom.isNotEmpty ? nom[0] : '',
+    ].join().toUpperCase();
+    if (mounted) {
+      setState(() {
+        _userName = fullName.isNotEmpty ? fullName : 'Utilisateur';
+        _userInitials = initials.isNotEmpty ? initials : '?';
+        _userEmail = prefs.getString('api_user_email') ?? '';
+        _userRole = prefs.getString('api_user_role') ?? '';
+        _familleName = prefs.getString('api_famille_nom') ?? '';
+        _familleCode = prefs.getString('api_famille_code') ?? '';
+      });
+    }
+  }
+
+  String _roleLabel() {
+    switch (_userRole) {
+      case 'admin': return 'Administrateur';
+      case 'gestionnaire': return 'Gestionnaire';
+      default: return 'Membre';
+    }
+  }
+
+  Color _roleColor(BuildContext context) {
+    switch (_userRole) {
+      case 'admin': return Colors.red.shade600;
+      case 'gestionnaire': return Colors.orange.shade700;
+      default: return Theme.of(context).colorScheme.primary;
+    }
+  }
+
+  Future<void> _pullOnStartup() async {
+    final token = await ApiService.getToken();
+    if (token == null) return;
+    try {
+      await SyncService().pullChanges();
+      // Rafraîchit l'UI après le pull
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
   
   @override
@@ -183,12 +245,26 @@ class _FamilyNavigationState extends State<FamilyNavigation>
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Center(
-                child: Text(
-                  'Family Connect',
-                  style: FamilyConnectTheme.bodyMedium.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _familleName.isNotEmpty ? _familleName : 'Family Connect',
+                      style: FamilyConnectTheme.bodyMedium.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (_familleCode.isNotEmpty)
+                      Text(
+                        _familleCode,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -274,6 +350,19 @@ class _FamilyNavigationState extends State<FamilyNavigation>
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  if (_userRole == 'admin' || _userRole == 'gestionnaire') ...[
+                    _buildMenuItem(
+                      icon: Icons.manage_accounts,
+                      title: 'Administration des membres',
+                      subtitle: 'Gérer les rôles des membres',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _navigateToScreen('membres_admin');
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
                   _buildMenuItem(
                     icon: Icons.emoji_events,
                     title: 'Gamification',
@@ -298,10 +387,35 @@ class _FamilyNavigationState extends State<FamilyNavigation>
                   
                   const SizedBox(height: 8),
                   
+                  if (_userRole == 'admin' || _userRole == 'gestionnaire') ...[
+                    _buildMenuItem(
+                      icon: Icons.auto_fix_high,
+                      title: 'Assistant de démarrage',
+                      subtitle: 'Remplir rapidement l\'arbre familial',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _navigateToScreen('wizard');
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  _buildMenuItem(
+                    icon: Icons.cloud_upload_outlined,
+                    title: 'Migrer vers le cloud',
+                    subtitle: 'Envoyer les données locales au serveur',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _syncMigrate();
+                    },
+                  ),
+
+                  const SizedBox(height: 8),
+
                   _buildMenuItem(
                     icon: Icons.settings,
-                    title: 'Paramètres',
-                    subtitle: 'Préférences et configuration',
+                    title: 'Parametres',
+                    subtitle: 'Preferences et configuration',
                     onTap: () {
                       Navigator.pop(context);
                       _navigateToScreen('settings');
@@ -413,30 +527,77 @@ class _FamilyNavigationState extends State<FamilyNavigation>
                               ),
                             ],
                           ),
-                          child: Icon(
-                            Icons.person,
-                            size: 40,
-                            color: Theme.of(context).colorScheme.primary,
+                          child: Center(
+                            child: Text(
+                              _userInitials,
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
                           ),
                         ),
-                        
+
                         const SizedBox(height: 16),
-                        
+
                         Text(
-                          'Utilisateur Test',
+                          _userName,
                           style: FamilyConnectTheme.h4.copyWith(
                             color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
-                        
-                        const SizedBox(height: 8),
-                        
-                        Text(
-                          'temp_user_123',
-                          style: FamilyConnectTheme.bodyMedium.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+
+                        const SizedBox(height: 6),
+
+                        if (_userEmail.isNotEmpty)
+                          Text(
+                            _userEmail,
+                            style: FamilyConnectTheme.bodyMedium.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
+
+                        const SizedBox(height: 10),
+
+                        // Badge rôle
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _roleColor(context).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: _roleColor(context).withValues(alpha: 0.4)),
+                          ),
+                          child: Text(
+                            _roleLabel(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _roleColor(context),
+                            ),
                           ),
                         ),
+
+                        if (_familleName.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.family_restroom,
+                                  size: 14,
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                              const SizedBox(width: 4),
+                              Text(
+                                _familleCode.isNotEmpty
+                                    ? '$_familleName · $_familleCode'
+                                    : _familleName,
+                                style: FamilyConnectTheme.bodySmall.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -645,6 +806,76 @@ class _FamilyNavigationState extends State<FamilyNavigation>
           ),
         );
         break;
+      case 'membres_admin':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MembresAdminScreen(),
+          ),
+        );
+        break;
+      case 'wizard':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const WizardScreen(),
+          ),
+        );
+        break;
+    }
+  }
+
+  /// Migration des données locales vers le cloud
+  Future<void> _syncMigrate() async {
+    final token = await ApiService.getToken();
+    if (!mounted) return;
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connexion serveur requise. Reconnectez-vous.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        title: Text('Sync en cours...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Envoi vers le serveur...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final result = await SyncService().migrateLocalData();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.summary),
+          backgroundColor: result.isSuccess ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur sync : $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -678,32 +909,43 @@ class _FamilyNavigationState extends State<FamilyNavigation>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: _buildAppBar(),
-      body: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) {
-          return ScaleTransition(
-            scale: _scaleAnimation,
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: _onPageChanged,
-              physics: const BouncingScrollPhysics(),
-              children: [
-                _buildHomePage(),
-                _buildSearchPage(),
-                _buildFamilyPage(),
-                _buildStoriesPage(),
-                _buildTimelinePage(),
-              ],
-            ),
-          );
-        },
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          _onTabTapped(0);
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        appBar: _buildAppBar(),
+        body: AnimatedBuilder(
+          animation: _scaleAnimation,
+          builder: (context, child) {
+            return ScaleTransition(
+              scale: _scaleAnimation,
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: _onPageChanged,
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  _buildHomePage(),
+                  _buildFamilyPage(),
+                  _buildSearchPage(),
+                  _buildStoriesPage(),
+                  _buildTimelinePage(),
+                ],
+              ),
+            );
+          },
+        ),
+        bottomNavigationBar: _buildModernBottomNavBar(),
+        floatingActionButton: _buildFloatingActionButton(),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
-      bottomNavigationBar: _buildModernBottomNavBar(),
-      floatingActionButton: _buildFloatingActionButton(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
   
@@ -761,15 +1003,15 @@ class _FamilyNavigationState extends State<FamilyNavigation>
                   index: 0,
                 ),
                 _buildNavItem(
-                  icon: Icons.search_outlined,
-                  activeIcon: Icons.search,
-                  label: 'Rechercher',
-                  index: 1,
-                ),
-                _buildNavItem(
                   icon: Icons.people_outline,
                   activeIcon: Icons.people,
                   label: 'Famille',
+                  index: 1,
+                ),
+                _buildNavItem(
+                  icon: Icons.search_outlined,
+                  activeIcon: Icons.search,
+                  label: 'Rechercher',
                   index: 2,
                 ),
                 _buildNavItem(
@@ -860,8 +1102,11 @@ class _FamilyNavigationState extends State<FamilyNavigation>
     );
   }
   
-  /// FloatingActionButton moderne avec gradient
+  /// FloatingActionButton moderne avec gradient (caché pour les simples membres)
   Widget _buildFloatingActionButton() {
+    if (_userRole != 'admin' && _userRole != 'gestionnaire') {
+      return const SizedBox.shrink();
+    }
     return Container(
       width: 56,
       height: 56,
@@ -1019,7 +1264,8 @@ class _FamilyNavigationState extends State<FamilyNavigation>
   
   /// Pages principales
   Widget _buildHomePage() {
-    return const ModernHomeScreen();
+    return const FamilyProfileScreen();
+    // return const ModernHomeScreen();
   }
   
   Widget _buildSearchPage() {
@@ -1027,7 +1273,8 @@ class _FamilyNavigationState extends State<FamilyNavigation>
   }
   
   Widget _buildFamilyPage() {
-    return const FamilyProfileScreen();
+    return const ModernHomeScreen();
+    // return const FamilyProfileScreen();
   }
   
   Widget _buildStoriesPage() {

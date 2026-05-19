@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/family_connect_theme.dart';
+import '../database/personne_repository.dart';
+import '../models/personne.dart';
+import '../screens/person_detail_screen.dart';
 import 'enhanced_search_bar.dart';
 
 /// Écran de recherche moderne avec suggestions IA
@@ -13,27 +16,26 @@ class ModernSearchScreen extends StatefulWidget {
 
 class _ModernSearchScreenState extends State<ModernSearchScreen>
     with TickerProviderStateMixin {
-  
+
+  final PersonneRepository _personneRepo = PersonneRepository();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   late AnimationController _slideController;
   late AnimationController _fadeController;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
-  
-  List<String> _recentSearches = [
-    'Marie Dupont',
-    'Jean Martin',
-    'Sophie Bernard',
-  ];
-  
-  List<String> _suggestions = [
+
+  List<String> _recentSearches = [];
+  List<Personne> _searchResults = [];
+  bool _isLoadingResults = false;
+
+  final List<String> _suggestions = [
     'Rechercher par nom',
     'Rechercher par date',
     'Rechercher par lieu',
     'Rechercher par relation',
   ];
-  
+
   bool _isSearching = false;
   String _searchQuery = '';
   
@@ -87,24 +89,43 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
       _searchQuery = value;
       _isSearching = value.isNotEmpty;
     });
-    
-    // Simuler la recherche avec délai
+
     if (value.isNotEmpty) {
+      setState(() => _isLoadingResults = true);
       Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          setState(() {
-            // Mettre à jour les suggestions basées sur la recherche
-          });
+        if (mounted && _searchQuery == value) {
+          _performSearch(value);
         }
+      });
+    } else {
+      setState(() {
+        _searchResults.clear();
+        _isLoadingResults = false;
       });
     }
   }
-  
+
+  Future<void> _performSearch(String query) async {
+    try {
+      final results = await _personneRepo.searchInAllFields(query);
+      if (mounted && _searchQuery == query) {
+        setState(() {
+          _searchResults
+            ..clear()
+            ..addAll(results);
+          _isLoadingResults = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingResults = false);
+    }
+  }
+
   void _onSearchSubmitted(String value) {
     HapticFeedback.lightImpact();
     if (value.isNotEmpty) {
       _addToRecentSearches(value);
-      // Effectuer la recherche
+      _performSearch(value);
     }
   }
   
@@ -164,13 +185,13 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         ),
         child: Row(
           children: [
-            IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: Icon(
-                Icons.arrow_back,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
+            // IconButton(
+            //   onPressed: () => Navigator.pop(context),
+            //   icon: Icon(
+            //     Icons.arrow_back,
+            //     color: Theme.of(context).colorScheme.onSurface,
+            //   ),
+            // ),
             const SizedBox(width: 8),
             Expanded(
               child: EnhancedSearchBar(
@@ -326,7 +347,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: FamilyConnectTheme.radiusSm,
           ),
           child: Row(
@@ -465,40 +486,126 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   }
   
   Widget _buildSearchResults() {
-    // Placeholder pour les résultats de recherche
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Text(
-            'Recherche pour "$_searchQuery"',
-            style: FamilyConnectTheme.h4.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
+    if (_isLoadingResults) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_searchResults.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.search,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Aucun résultat trouvé',
-                    style: FamilyConnectTheme.bodyMedium.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 16),
+            Text(
+              'Aucun résultat pour "$_searchQuery"',
+              style: FamilyConnectTheme.bodyMedium.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Text(
+            '${_searchResults.length} résultat${_searchResults.length > 1 ? 's' : ''}',
+            style: FamilyConnectTheme.bodySmall.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
           ),
-        ],
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _searchResults.length,
+            itemBuilder: (context, index) {
+              final personne = _searchResults[index];
+              return _buildPersonResultTile(personne);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPersonResultTile(Personne personne) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _addToRecentSearches(personne.nomComplet);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PersonDetailScreen(personneId: personne.id),
+            ),
+          );
+        },
+        borderRadius: FamilyConnectTheme.radiusSm,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: FamilyConnectTheme.radiusSm,
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                child: Text(
+                  personne.nomComplet.isNotEmpty ? personne.nomComplet[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      personne.nomComplet,
+                      style: FamilyConnectTheme.bodyMedium.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (personne.dateNaissance != null || personne.lieuNaissance != null)
+                      Text(
+                        [
+                          if (personne.dateNaissance != null) personne.dateNaissance!.toString(),
+                          if (personne.lieuNaissance != null) personne.lieuNaissance!,
+                        ].join(' · '),
+                        style: FamilyConnectTheme.bodySmall.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

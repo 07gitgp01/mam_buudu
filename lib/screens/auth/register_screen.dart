@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../services/api_service.dart';
 import '../../services/auth_local_service.dart';
-import '../../theme/family_connect_theme.dart';
-import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -10,410 +10,550 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen>
-    with SingleTickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  final _nomController = TextEditingController();
-  final _prenomController = TextEditingController();
-  final _reponseSecreteController = TextEditingController();
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _formKey1 = GlobalKey<FormState>();
+  final _formKey2 = GlobalKey<FormState>();
+  final PageController _pageController = PageController();
 
+  int _currentStep = 0;
   bool _isLoading = false;
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
-  String _selectedQuestion = AuthLocalService.questionsSecretes.first;
+  bool _passwordVisible = false;
+  bool _codeAutoGenere = true;
 
-  final AuthLocalService _authService = AuthLocalService();
+  // Étape 1 — Famille
+  final _nomFamilleCtrl = TextEditingController();
+  final _codeUniqueCtrl = TextEditingController();
+  final _lieuCtrl = TextEditingController();
 
-  late AnimationController _animController;
-  late Animation<double> _fadeIn;
-  late Animation<Offset> _slideUp;
+  // Étape 2 — Administrateur
+  final _prenomCtrl = TextEditingController();
+  final _nomCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _telephoneCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
+  String? _questionSecrete;
+  final _reponseSecreteCtrl = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      duration: const Duration(milliseconds: 700),
-      vsync: this,
-    );
-    _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
-    _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.12),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
-    _animController.forward();
-  }
+  static const List<String> _questions = [
+    'Quel est le nom de votre premier animal de compagnie ?',
+    'Dans quelle ville êtes-vous né(e) ?',
+    'Quel est le nom de votre professeur préféré ?',
+    'Quelle est votre couleur préférée ?',
+    'Quel est le plat préféré de votre enfance ?',
+    "Quel est le nom de votre meilleure amie d'enfance ?",
+  ];
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    _nomController.dispose();
-    _prenomController.dispose();
-    _reponseSecreteController.dispose();
-    _animController.dispose();
+    _pageController.dispose();
+    _nomFamilleCtrl.dispose();
+    _codeUniqueCtrl.dispose();
+    _lieuCtrl.dispose();
+    _prenomCtrl.dispose();
+    _nomCtrl.dispose();
+    _emailCtrl.dispose();
+    _telephoneCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
+    _reponseSecreteCtrl.dispose();
     super.dispose();
   }
 
-  bool _isValidEmail(String email) {
-    final regex = RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$');
-    return regex.hasMatch(email);
+  void _nextStep() {
+    if (!_formKey1.currentState!.validate()) return;
+    setState(() => _currentStep = 1);
+    _pageController.animateToPage(1,
+        duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
   }
 
-  Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_passwordController.text != _confirmPasswordController.text) {
-      _showError('Les mots de passe ne correspondent pas');
+  void _prevStep() {
+    setState(() => _currentStep = 0);
+    _pageController.animateToPage(0,
+        duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey2.currentState!.validate()) return;
+    if (_questionSecrete == null) {
+      _showError('Veuillez choisir une question secrète');
       return;
     }
 
     setState(() => _isLoading = true);
 
-    try {
-      final success = await _authService.register(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        nom: _nomController.text.trim(),
-        prenom: _prenomController.text.trim(),
-        questionSecrete: _selectedQuestion,
-        reponseSecrete: _reponseSecreteController.text.trim(),
+    final serverOk = await ApiService.isServerReachable();
+    String? error;
+
+    if (serverOk) {
+      error = await ApiService.register(
+        nomFamille: _nomFamilleCtrl.text.trim(),
+        codeUnique: _codeAutoGenere ? null : _codeUniqueCtrl.text.trim().toUpperCase(),
+        lieu: _lieuCtrl.text.trim().isEmpty ? null : _lieuCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        telephone: _telephoneCtrl.text.trim().isEmpty ? null : _telephoneCtrl.text.trim(),
+        password: _passwordCtrl.text,
+        nom: _nomCtrl.text.trim(),
+        prenom: _prenomCtrl.text.trim(),
+        questionSecrete: _questionSecrete!,
+        reponseSecrete: _reponseSecreteCtrl.text.trim(),
       );
-
-      if (!mounted) return;
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Compte créé avec succès ! Vous pouvez vous connecter.'),
-            backgroundColor: Colors.green,
-          ),
+      // Sauvegarde locale aussi pour mode hors-ligne
+      if (error == null) {
+        final local = AuthLocalService();
+        await local.register(
+          email: _emailCtrl.text.trim(),
+          password: _passwordCtrl.text,
+          nom: _nomCtrl.text.trim(),
+          prenom: _prenomCtrl.text.trim(),
+          questionSecrete: _questionSecrete!,
+          reponseSecrete: _reponseSecreteCtrl.text.trim(),
         );
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
-      } else {
-        _showError("Cet email est déjà utilisé ou une erreur s'est produite.");
       }
-    } catch (e) {
-      if (mounted) _showError('Erreur lors de la création du compte.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } else {
+      final local = AuthLocalService();
+      final registered = await local.register(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+        nom: _nomCtrl.text.trim(),
+        prenom: _prenomCtrl.text.trim(),
+        questionSecrete: _questionSecrete!,
+        reponseSecrete: _reponseSecreteCtrl.text.trim(),
+      );
+      if (!registered) {
+        error = 'Impossible de créer le compte hors-ligne';
+      } else {
+        final loggedIn = await local.login(
+          _emailCtrl.text.trim(),
+          _passwordCtrl.text,
+        );
+        if (!loggedIn) error = 'Erreur lors de la connexion hors-ligne';
+      }
     }
+
+    if (mounted) setState(() => _isLoading = false);
+    if (error != null) { _showError(error); return; }
+    if (mounted) Navigator.pushReplacementNamed(context, '/home');
   }
 
-  void _showError(String message) {
+  void _showError(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: FamilyConnectTheme.errorColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: FamilyConnectTheme.radiusSm),
-      ),
+      SnackBar(content: Text(msg), backgroundColor: Colors.red),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: FamilyConnectTheme.primaryGradient),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                child: FadeTransition(
-                  opacity: _fadeIn,
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: FamilyConnectTheme.radiusSm,
-                          ),
-                          child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Créer un compte',
-                            style: FamilyConnectTheme.h3.copyWith(color: Colors.white),
-                          ),
-                          Text(
-                            'Rejoignez votre famille sur Mam Buudu',
-                            style: FamilyConnectTheme.bodySmall.copyWith(
-                              color: Colors.white.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Formulaire
-              Expanded(
-                child: SlideTransition(
-                  position: _slideUp,
-                  child: FadeTransition(
-                    opacity: _fadeIn,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(32),
-                        ),
-                      ),
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(28, 28, 28, 32),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Nom + Prénom côte à côte
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _nomController,
-                                      textCapitalization: TextCapitalization.words,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Nom',
-                                        prefixIcon: Icon(Icons.person_outline),
-                                      ),
-                                      validator: (v) => (v == null || v.trim().isEmpty)
-                                          ? 'Requis'
-                                          : null,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _prenomController,
-                                      textCapitalization: TextCapitalization.words,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Prénom',
-                                        prefixIcon: Icon(Icons.badge_outlined),
-                                      ),
-                                      validator: (v) => (v == null || v.trim().isEmpty)
-                                          ? 'Requis'
-                                          : null,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Email
-                              TextFormField(
-                                controller: _emailController,
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                  labelText: 'Adresse email',
-                                  prefixIcon: Icon(Icons.email_outlined),
-                                ),
-                                validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return 'Veuillez entrer votre email';
-                                  if (!_isValidEmail(v.trim())) return 'Adresse email invalide';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Mot de passe
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscurePassword,
-                                textInputAction: TextInputAction.next,
-                                decoration: InputDecoration(
-                                  labelText: 'Mot de passe',
-                                  prefixIcon: const Icon(Icons.lock_outlined),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(_obscurePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined),
-                                    onPressed: () =>
-                                        setState(() => _obscurePassword = !_obscurePassword),
-                                  ),
-                                  helperText: 'Minimum 8 caractères',
-                                ),
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Veuillez entrer un mot de passe';
-                                  if (v.length < 8) return 'Minimum 8 caractères requis';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Confirmation mot de passe
-                              TextFormField(
-                                controller: _confirmPasswordController,
-                                obscureText: _obscureConfirm,
-                                textInputAction: TextInputAction.next,
-                                decoration: InputDecoration(
-                                  labelText: 'Confirmer le mot de passe',
-                                  prefixIcon: const Icon(Icons.lock_outline),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(_obscureConfirm
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined),
-                                    onPressed: () =>
-                                        setState(() => _obscureConfirm = !_obscureConfirm),
-                                  ),
-                                ),
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Veuillez confirmer le mot de passe';
-                                  if (v != _passwordController.text) return 'Les mots de passe ne correspondent pas';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Séparateur section sécurité
-                              Row(
-                                children: [
-                                  const Expanded(child: Divider()),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    child: Text(
-                                      'Sécurité du compte',
-                                      style: FamilyConnectTheme.bodySmall.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                  ),
-                                  const Expanded(child: Divider()),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Question secrète
-                              DropdownButtonFormField<String>(
-                                initialValue: _selectedQuestion,
-                                decoration: const InputDecoration(
-                                  labelText: 'Question secrète',
-                                  prefixIcon: Icon(Icons.security_outlined),
-                                ),
-                                items: AuthLocalService.questionsSecretes
-                                    .map((q) => DropdownMenuItem(
-                                          value: q,
-                                          child: Text(
-                                            q,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: FamilyConnectTheme.bodySmall,
-                                          ),
-                                        ))
-                                    .toList(),
-                                onChanged: (v) => setState(() => _selectedQuestion = v!),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Réponse secrète
-                              TextFormField(
-                                controller: _reponseSecreteController,
-                                textInputAction: TextInputAction.done,
-                                decoration: const InputDecoration(
-                                  labelText: 'Réponse secrète',
-                                  prefixIcon: Icon(Icons.key_outlined),
-                                ),
-                                validator: (v) => (v == null || v.trim().isEmpty)
-                                    ? 'Veuillez entrer une réponse secrète'
-                                    : null,
-                              ),
-                              const SizedBox(height: 28),
-
-                              // Bouton inscription
-                              SizedBox(
-                                height: 52,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _register,
-                                  style: ElevatedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: FamilyConnectTheme.radiusMd,
-                                    ),
-                                  ),
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2.5,
-                                          ),
-                                        )
-                                      : const Text(
-                                          "S'inscrire",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Lien connexion
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'Déjà un compte ? ',
-                                    style: FamilyConnectTheme.bodySmall.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: () => Navigator.of(context).pushAndRemoveUntil(
-                                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                                      (route) => false,
-                                    ),
-                                    child: Text(
-                                      'Se connecter',
-                                      style: FamilyConnectTheme.bodySmall.copyWith(
-                                        color: FamilyConnectTheme.primaryColor,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+      backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: _currentStep == 1
+            ? IconButton(onPressed: _prevStep, icon: const Icon(Icons.arrow_back))
+            : IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+        title: Text(_currentStep == 0 ? 'Créer une famille' : 'Votre compte admin'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4),
+          child: LinearProgressIndicator(
+            value: (_currentStep + 1) / 2,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
           ),
         ),
       ),
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          _buildStep1(theme),
+          _buildStep2(theme),
+        ],
+      ),
     );
+  }
+
+  // ── Étape 1 : Informations famille ───────────────────────────────────────────
+
+  Widget _buildStep1(ThemeData theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey1,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            Text('Votre famille',
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(
+              'Ces informations permettront aux membres de retrouver votre famille lors de la connexion.',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+            ),
+            const SizedBox(height: 32),
+
+            TextFormField(
+              controller: _nomFamilleCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Nom de la famille *',
+                hintText: 'Ex: Famille Traoré, Clan Diallo...',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.family_restroom),
+              ),
+              textCapitalization: TextCapitalization.words,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Nom de famille requis' : null,
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _lieuCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Lieu (ville, pays)',
+                hintText: 'Ex: Ouagadougou, Burkina Faso',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 24),
+
+            Text("Code d'accès famille",
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text(
+              'Les membres utiliseront ce code pour se connecter à votre famille.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildToggleButton(
+                    label: 'Auto-généré',
+                    icon: Icons.auto_fix_high,
+                    selected: _codeAutoGenere,
+                    onTap: () => setState(() => _codeAutoGenere = true),
+                    theme: theme,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildToggleButton(
+                    label: 'Je le choisis',
+                    icon: Icons.edit_outlined,
+                    selected: !_codeAutoGenere,
+                    onTap: () => setState(() => _codeAutoGenere = false),
+                    theme: theme,
+                  ),
+                ),
+              ],
+            ),
+
+            if (!_codeAutoGenere) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _codeUniqueCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Code personnalisé *',
+                  hintText: 'Ex: TRAORE2024',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.vpn_key_outlined),
+                  helperText: 'Lettres et chiffres, 4 à 12 caractères',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.casino_outlined),
+                    tooltip: 'Générer un code',
+                    onPressed: _generateRandomCode,
+                  ),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                  _UpperCaseFormatter(),
+                ],
+                validator: (v) {
+                  if (_codeAutoGenere) return null;
+                  if (v == null || v.trim().length < 4) return 'Minimum 4 caractères';
+                  if (v.trim().length > 12) return 'Maximum 12 caractères';
+                  return null;
+                },
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Un code unique sera généré automatiquement et affiché après la création.',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.colorScheme.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 40),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _nextStep,
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16)),
+                child: const Text('Continuer →'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                child: const Text('Déjà un compte ? Se connecter'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _generateRandomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final code = List.generate(6, (i) => chars[(now ~/ (i + 1)) % chars.length]).join();
+    setState(() => _codeUniqueCtrl.text = code);
+  }
+
+  Widget _buildToggleButton({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+    required ThemeData theme,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(icon,
+                color: selected
+                    ? Colors.white
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : theme.colorScheme.onSurface,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Étape 2 : Compte administrateur ──────────────────────────────────────────
+
+  Widget _buildStep2(ThemeData theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey2,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            Text('Votre compte',
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(
+              'Vous serez l\'administrateur de "${_nomFamilleCtrl.text}".',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+            ),
+            const SizedBox(height: 32),
+
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _prenomCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Prénom *', border: OutlineInputBorder()),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Requis' : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _nomCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Nom *', border: OutlineInputBorder()),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Requis' : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _emailCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Email *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Email requis';
+                if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) {
+                  return 'Email invalide';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _telephoneCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Téléphone (optionnel)',
+                hintText: '+226 70 00 00 00',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _passwordCtrl,
+              decoration: InputDecoration(
+                labelText: 'Mot de passe *',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.lock_outlined),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                      _passwordVisible ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () =>
+                      setState(() => _passwordVisible = !_passwordVisible),
+                ),
+              ),
+              obscureText: !_passwordVisible,
+              validator: (v) =>
+                  (v == null || v.length < 8) ? 'Minimum 8 caractères' : null,
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _confirmPasswordCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Confirmer le mot de passe *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock_outlined),
+              ),
+              obscureText: true,
+              validator: (v) => v != _passwordCtrl.text
+                  ? 'Les mots de passe ne correspondent pas'
+                  : null,
+            ),
+            const SizedBox(height: 24),
+
+            Text('Sécurité du compte',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Question secrète *',
+                border: OutlineInputBorder(),
+              ),
+              initialValue: _questionSecrete,
+              isExpanded: true,
+              items: _questions
+                  .map((q) => DropdownMenuItem(
+                      value: q,
+                      child: Text(q,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13))))
+                  .toList(),
+              onChanged: (v) => setState(() => _questionSecrete = v),
+              validator: (v) => v == null ? 'Choisissez une question' : null,
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _reponseSecreteCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Réponse secrète *',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Réponse requise' : null,
+            ),
+            const SizedBox(height: 40),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16)),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Créer la famille'),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UpperCaseFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue old, TextEditingValue current) {
+    return current.copyWith(text: current.text.toUpperCase());
   }
 }
