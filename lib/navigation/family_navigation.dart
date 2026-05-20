@@ -50,6 +50,7 @@ class _FamilyNavigationState extends State<FamilyNavigation>
 
   int _currentIndex = 0;
   bool _isAnimating = false;
+  bool _isSyncing = false;
 
   final AuthLocalService _authService = AuthLocalService();
 
@@ -129,6 +130,33 @@ class _FamilyNavigationState extends State<FamilyNavigation>
       case 'admin': return Colors.red.shade600;
       case 'gestionnaire': return Colors.orange.shade700;
       default: return Theme.of(context).colorScheme.primary;
+    }
+  }
+
+  Future<void> _syncData() async {
+    if (_isSyncing) return;
+    HapticFeedback.mediumImpact();
+    setState(() => _isSyncing = true);
+    try {
+      await SyncService().pullChanges();
+      if (mounted) setState(() => _isSyncing = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(children: [
+              Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text('Données synchronisées'),
+            ]),
+            backgroundColor: const Color(0xFF059669),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isSyncing = false);
     }
   }
 
@@ -270,8 +298,44 @@ class _FamilyNavigationState extends State<FamilyNavigation>
             ),
           ),
           
-          const SizedBox(width: 16),
-          
+          const SizedBox(width: 8),
+
+          // Bouton sync
+          GestureDetector(
+            onTap: _syncData,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _isSyncing
+                    ? const Color(0xFF059669)
+                    : Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: _isSyncing
+                  ? const SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      Icons.cloud_sync_outlined,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      size: 24,
+                    ),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
           // Profil
           GestureDetector(
             onTap: _showProfileDrawer,

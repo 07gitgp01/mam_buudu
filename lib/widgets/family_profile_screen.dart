@@ -655,7 +655,6 @@ Connectez-vous sur l'application Mam Buudu avec ces identifiants (lecture seule)
                 color: FamilyConnectTheme.primaryGradient,
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  // Partager l'arbre
                 },
               ),
             ),
@@ -667,7 +666,6 @@ Connectez-vous sur l'application Mam Buudu avec ces identifiants (lecture seule)
                 color: FamilyConnectTheme.secondaryGradient,
                 onTap: () {
                   HapticFeedback.mediumImpact();
-                  // Exporter les données
                 },
               ),
             ),
@@ -677,10 +675,7 @@ Connectez-vous sur l'application Mam Buudu avec ces identifiants (lecture seule)
                 icon: Icons.settings,
                 label: 'Paramètres',
                 color: FamilyConnectTheme.accentGradient,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  // Paramètres de la famille
-                },
+                onTap: () => HapticFeedback.mediumImpact(),
               ),
             ),
           ],

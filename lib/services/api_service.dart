@@ -14,7 +14,7 @@ class FamilleInfo {
 }
 
 class ApiService {
-  static const String _baseUrl = 'http://192.168.1.70:3000';
+  static const String _baseUrl = 'http://10.10.0.34:3000';
   static const Duration _timeout = Duration(seconds: 15);
 
   // ── Token JWT ────────────────────────────────────────────────────────────────

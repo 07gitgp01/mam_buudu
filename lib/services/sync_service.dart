@@ -78,15 +78,18 @@ class SyncService {
         final existing = await _unionRepo.getById(union.id);
         if (existing == null) {
           await _unionRepo.insert(union);
-          for (int i = 0; i < parentIds.length; i++) {
-            await _unionRepo.ajouterParticipant(union.id, parentIds[i], ordre: i);
-          }
         } else {
           await _unionRepo.update(union);
-          await _unionRepo.retirerTousParticipants(union.id);
-          for (int i = 0; i < parentIds.length; i++) {
-            await _unionRepo.ajouterParticipant(union.id, parentIds[i], ordre: i);
-          }
+        }
+        // Sync participants (époux)
+        await _unionRepo.retirerTousParticipants(union.id);
+        for (int i = 0; i < parentIds.length; i++) {
+          await _unionRepo.ajouterParticipant(union.id, parentIds[i], ordre: i);
+        }
+        // Sync filiations (enfants) — était manquant, causait l'arbre incomplet
+        await _unionRepo.retirerToutesFiliations(union.id);
+        for (int i = 0; i < enfantIds.length; i++) {
+          await _unionRepo.ajouterFiliation(union.id, enfantIds[i], ordre: i);
         }
         unionsAdded++;
       } catch (_) {}

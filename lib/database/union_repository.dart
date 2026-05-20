@@ -159,6 +159,27 @@ class UnionRepository {
     );
   }
 
+  Future<void> ajouterFiliation(String unionId, String enfantId, {int ordre = 0}) async {
+    final db = await _dbHelper.database;
+    final existing = await db.query(
+      'filiations',
+      where: 'union_id = ? AND enfant_id = ?',
+      whereArgs: [unionId, enfantId],
+    );
+    if (existing.isEmpty) {
+      await db.insert('filiations', {
+        'union_id': unionId,
+        'enfant_id': enfantId,
+        'ordre_naissance': ordre,
+      });
+    }
+  }
+
+  Future<void> retirerToutesFiliations(String unionId) async {
+    final db = await _dbHelper.database;
+    await db.delete('filiations', where: 'union_id = ?', whereArgs: [unionId]);
+  }
+
   Future<List<Personne>> getParticipants(String unionId) async {
     final db = await _dbHelper.database;
     final maps = await db.rawQuery('''
